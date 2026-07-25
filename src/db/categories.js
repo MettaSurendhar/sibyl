@@ -1,0 +1,98 @@
+import { getDb, newId } from './database';
+import { renderTemplate, DEFAULT_CATEGORY_TEMPLATE, DEFAULT_UNTAGGED_TEMPLATE } from '../utils/naming';
+
+export async function listCategories() {
+  const db = await getDb();
+  return db.getAllAsync('SELECT * FROM categories ORDER BY sortOrder ASC');
+}
+
+export async function createCategory({ name, prefix, color, nameTemplate }) {
+  const db = await getDb();
+  const id = newId('cat');
+  const countRow = await db.getFirstAsync('SELECT COUNT(*) as c FROM categories');
+  await db.runAsync(
+    'INSERT INTO categories (id, name, prefix, counter, color, sortOrder, nameTemplate) VALUES (?, ?, ?, 0, ?, ?, ?)',
+    [id, name, prefix || name, color || '#6C8EF5', countRow.c, nameTemplate || DEFAULT_CATEGORY_TEMPLATE]
+  );
+  return id;
+}
+
+export async function updateCategory(id, { name, prefix, color, nameTemplate }) {
+  const db = await getDb();
+  await db.runAsync('UPDATE categories SET name = ?, prefix = ?, color = ?, nameTemplate = ? WHERE id = ?', [
+    name,
+    prefix,
+    color,
+    nameTemplate,
+    id,
+  ]);
+}
+
+export async function deleteCategory(id) {
+  const db = await getDb();
+  await db.runAsync('UPDATE entries SET categoryId = NULL WHERE categoryId = ?', [id]);
+  await db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
+}
+
+// Counts entries CURRENTLY tagged with this category. This (not a persisted incrementing
+// counter) is what drives "next count" - so deleting recordings genuinely frees up numbers,
+// rather than the count marching on forever regardless of deletions.
+export async function getCategoryEntryCount(categoryId) {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT COUNT(*) as c FROM entries WHERE categoryId = ?', [categoryId]);
+  return row?.c || 0;
+}
+
+export async function getUntaggedEntryCount() {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT COUNT(*) as c FROM entries WHERE categoryId IS NULL');
+  return row?.c || 0;
+}
+
+// Preview-only: what the name WOULD be if this category is chosen, without saving anything.
+export async function previewNameForCategory(category) {
+  if (!category) return null;
+  const count = (await getCategoryEntryCount(category.id)) + 1;
+  return renderTemplate(category.nameTemplate || DEFAULT_CATEGORY_TEMPLATE, { tag: category.name, count });
+}
+
+// Final name at actual save time - same count logic, just called at the moment of saving.
+export async function nextNameForCategory(categoryId) {
+  const db = await getDb();
+  const cat = await db.getFirstAsync('SELECT * FROM categories WHERE id = ?', [categoryId]);
+  if (!cat) return null;
+  const count = (await getCategoryEntryCount(categoryId)) + 1;
+  return renderTemplate(cat.nameTemplate || DEFAULT_CATEGORY_TEMPLATE, { tag: cat.name, count });
+}
+
+// --- Untagged ("no category picked") naming - same "count reflects reality" approach ---
+
+export async function getUntaggedTemplate() {
+  const db = await getDb();
+  const row = await db.getFirstAsync("SELECT value FROM settings WHERE key = 'untaggedTemplate'");
+  return row?.value || DEFAULT_UNTAGGED_TEMPLATE;
+}
+
+export async function setUntaggedTemplate(template) {
+  const db = await getDb();
+  await db.runAsync("UPDATE settings SET value = ? WHERE key = 'untaggedTemplate'", [template]);
+}
+
+export async function previewUntaggedName() {
+  const count = (await getUntaggedEntryCount()) + 1;
+  const template = await getUntaggedTemplate();
+  return renderTemplate(template, { count });
+}
+
+export async function nextUntaggedName() {
+  const count = (await getUntaggedEntryCount()) + 1;
+  const template = await getUntaggedTemplate();
+  return renderTemplate(template, { count });
+}
+
+// Total recordings made so far (used for the live "Recording #N" title on the Record screen).
+export async function totalEntryCount() {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT COUNT(*) as c FROM entries');
+  return row?.c || 0;
+}

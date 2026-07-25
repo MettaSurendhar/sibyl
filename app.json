@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Sibyl",
+    "slug": "sibyl",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "sibyl",
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mettasurendhar.sibyl",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Sibyl needs your microphone to record journal entries."
+      }
+    },
+    "android": {
+      "package": "com.mettasurendhar.sibyl",
+      "permissions": ["RECORD_AUDIO", "WRITE_EXTERNAL_STORAGE"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0E1926"
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Sibyl needs your microphone to record journal entries."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0E1926"
+        }
+      ],
+      "./plugins/withFfmpegKitFix.js"
+    ]
+  }
+}
