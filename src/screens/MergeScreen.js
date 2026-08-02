@@ -8,12 +8,12 @@ import {
 	StyleSheet,
 	Modal,
 	ActivityIndicator,
-	Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import TagNameSheet from '../components/TagNameSheet';
 import { concatFiles } from '../audio/ffmpegModule';
 import { listEntries, getEntry, createEntry } from '../db/entries';
@@ -23,6 +23,7 @@ import { renderTemplate } from '../utils/naming';
 
 export default function MergeScreen({ route, navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const { entryId } = route.params;
 	const [currentEntry, setCurrentEntry] = useState(null);
@@ -96,7 +97,7 @@ export default function MergeScreen({ route, navigation }) {
 
 			navigation.replace('Playback', { entryId: newId });
 		} catch (e) {
-			Alert.alert('Merge failed', e.message);
+			alert('Merge failed', e.message);
 		} finally {
 			setProcessing(false);
 		}
