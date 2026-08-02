@@ -7,7 +7,6 @@ import {
 	PanResponder,
 	Modal,
 	ActivityIndicator,
-	Alert,
 	BackHandler,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import { StaticWaveform, ScrollingPlaybackTrack } from '../components/Waveform';
 import ConfirmModal from '../components/ConfirmModal';
 import TagNameSheet from '../components/TagNameSheet';
@@ -38,6 +38,7 @@ function formatCentis(ms) {
 
 export default function TrimScreen({ route, navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const { entryId } = route.params;
 	const [entry, setEntry] = useState(null);
@@ -253,7 +254,7 @@ export default function TrimScreen({ route, navigation }) {
 			}
 			navigation.replace('Playback', { entryId: newId });
 		} catch (e) {
-			Alert.alert('Trim failed', e.message);
+			alert('Trim failed', e.message);
 		} finally {
 			setProcessing(false);
 		}
