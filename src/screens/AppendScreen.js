@@ -4,7 +4,6 @@ import {
 	Text,
 	TouchableOpacity,
 	StyleSheet,
-	Alert,
 	BackHandler,
 	Modal,
 	ActivityIndicator,
@@ -15,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import { LiveWaveform, WaveformRuler } from '../components/Waveform';
 import { createRecorder } from '../audio/recorder';
 import { concatFiles } from '../audio/ffmpegModule';
@@ -34,6 +34,7 @@ function formatCentis(ms) {
 
 export default function AppendScreen({ route, navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const { entryId } = route.params;
 	const [entry, setEntry] = useState(null);
@@ -100,7 +101,7 @@ export default function AppendScreen({ route, navigation }) {
 			setSamples([]);
 			setElapsedMs(0);
 		} catch (e) {
-			Alert.alert('Could not start recording', e.message);
+			alert('Could not start recording', e.message);
 		}
 	}
 
@@ -148,7 +149,7 @@ export default function AppendScreen({ route, navigation }) {
 			setDefaultName(renderTemplate(template, { name: entry.title }));
 			setSaveSheetOpen(true);
 		} catch (e) {
-			Alert.alert('Append failed', e.message);
+			alert('Append failed', e.message);
 		} finally {
 			setProcessing(false);
 		}
@@ -176,7 +177,7 @@ export default function AppendScreen({ route, navigation }) {
 			mergedResultRef.current = null;
 			navigation.replace('Playback', { entryId: newId });
 		} catch (e) {
-			Alert.alert('Save failed', e.message);
+			alert('Save failed', e.message);
 		} finally {
 			setProcessing(false);
 		}
