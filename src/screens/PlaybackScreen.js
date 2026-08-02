@@ -5,7 +5,6 @@ import {
 	TouchableOpacity,
 	Pressable,
 	StyleSheet,
-	Alert,
 	ScrollView,
 	BackHandler,
 	useWindowDimensions,
@@ -18,6 +17,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import { ScrollingPlaybackTrack } from '../components/Waveform';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -53,6 +53,7 @@ const NO_API_KEY = 'no-api-key';
 
 export default function PlaybackScreen({ route, navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const { width } = useWindowDimensions();
 	const { entryId } = route.params;
@@ -212,7 +213,7 @@ export default function PlaybackScreen({ route, navigation }) {
 		setMenuOpen(false);
 		const lastUri = entry.segments[entry.segments.length - 1]?.uri;
 		if (lastUri && (await Sharing.isAvailableAsync())) {
-			Alert.alert(
+			alert(
 				'Set as ringtone',
 				'Choose "Set as ringtone" from the share sheet, or save and set it from Sound settings.',
 			);
@@ -222,7 +223,7 @@ export default function PlaybackScreen({ route, navigation }) {
 
 	function handleDetails() {
 		setMenuOpen(false);
-		Alert.alert(
+		alert(
 			'Details',
 			`Category: ${entry.categoryName || 'Untagged'}\nDuration: ${formatDuration(entry.totalDurationMs)}\nSegments: ${entry.segments.length}\nCreated: ${new Date(entry.createdAt).toLocaleString()}`,
 		);
@@ -301,7 +302,7 @@ export default function PlaybackScreen({ route, navigation }) {
 	async function handleCopyTranscript() {
 		if (!entry.transcript) return;
 		await Clipboard.setStringAsync(entry.transcript);
-		Alert.alert('Copied', 'Transcript copied to clipboard.');
+		alert('Copied', 'Transcript copied to clipboard.');
 	}
 
 	async function handleShareTranscript() {
@@ -325,9 +326,9 @@ export default function PlaybackScreen({ route, navigation }) {
 				transcriptFilename(),
 				entry.transcript,
 			);
-			Alert.alert('Saved', 'Transcript saved to your chosen folder.');
+			alert('Saved', 'Transcript saved to your chosen folder.');
 		} catch (e) {
-			Alert.alert(
+			alert(
 				"Couldn't save",
 				e.message || 'Something went wrong saving the transcript.',
 			);
@@ -347,7 +348,7 @@ export default function PlaybackScreen({ route, navigation }) {
 			await writeTranscriptToFolder(existingFolder);
 			return;
 		}
-		Alert.alert(
+		alert(
 			'Choose a folder',
 			'Pick where transcripts should be saved (e.g. your Downloads folder). You only need to do this once.',
 			[
