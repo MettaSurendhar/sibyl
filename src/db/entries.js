@@ -3,23 +3,26 @@ import { getRecordingsFolderUri } from '../utils/settingsStore';
 import {
 	copyFileToFolder,
 	isExternalFolderSupported,
+	deleteFileByUri,
 } from '../utils/externalFolder';
 
 // Best-effort mirror of a finished recording into the user's chosen external folder (Settings ->
 // Saving folder), if one is configured. The app's own internal copy (in FileSystem storage) stays
 // the one actually used for playback/trim/merge - this is purely an extra, user-visible copy, so
 // any failure here (folder deleted, permission revoked, iOS, no folder configured) must never
-// surface as an error or block the recording save that already succeeded.
+// surface as an error or block the recording save that already succeeded. Returns the mirrored
+// file's own content:// URI on success (so the caller can remember it against the segment, for
+// precise deletion later), or null if no copy was made.
 async function mirrorToExternalFolder(uri, title) {
-	if (!isExternalFolderSupported()) return;
+	if (!isExternalFolderSupported()) return null;
 	try {
 		const folderUri = await getRecordingsFolderUri();
-		if (!folderUri) return;
+		if (!folderUri) return null;
 		const ext = (uri.split('.').pop() || 'm4a').split('?')[0];
 		const safeTitle =
 			(title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() ||
 			'recording';
-		await copyFileToFolder(
+		return await copyFileToFolder(
 			folderUri,
 			uri,
 			`${safeTitle}.${ext}`,
@@ -27,6 +30,7 @@ async function mirrorToExternalFolder(uri, title) {
 		);
 	} catch (e) {
 		// silently skip - see comment above
+		return null;
 	}
 }
 
@@ -41,7 +45,7 @@ async function mirrorToExternalFolder(uri, title) {
 export async function backfillRecordingsToFolder(folderUri, onProgress) {
 	const db = await getDb();
 	const segments = await db.getAllAsync(`
-    SELECT s.uri as uri, e.title as title
+    SELECT s.id as id, s.uri as uri, e.title as title
     FROM segments s
     JOIN entries e ON e.id = s.entryId
     ORDER BY s.createdAt ASC
@@ -55,12 +59,18 @@ export async function backfillRecordingsToFolder(folderUri, onProgress) {
 			const safeTitle =
 				(seg.title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() ||
 				'recording';
-			await copyFileToFolder(
+			const externalUri = await copyFileToFolder(
 				folderUri,
 				seg.uri,
 				`${safeTitle}.${ext}`,
 				`audio/${ext}`,
 			);
+			if (externalUri) {
+				await db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [
+					externalUri,
+					seg.id,
+				]);
+			}
 			copied++;
 		} catch (e) {
 			failed++;
@@ -133,11 +143,19 @@ export async function createEntry({
 			JSON.stringify(sanitizeWaveform(waveform)),
 		],
 	);
+	const segId = newId('seg');
 	await db.runAsync(
 		'INSERT INTO segments (id, entryId, uri, durationMs, orderIndex, createdAt) VALUES (?, ?, ?, ?, 0, ?)',
-		[newId('seg'), id, uri, durationMs, now],
+		[segId, id, uri, durationMs, now],
 	);
-	mirrorToExternalFolder(uri, title);
+	mirrorToExternalFolder(uri, title).then((externalUri) => {
+		if (externalUri) {
+			db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [
+				externalUri,
+				segId,
+			]);
+		}
+	});
 	return id;
 }
 
@@ -149,9 +167,10 @@ export async function appendSegment(entryId, { uri, durationMs, waveform }) {
 		[entryId],
 	);
 	const nextOrder = existing.length;
+	const segId = newId('seg');
 	await db.runAsync(
 		'INSERT INTO segments (id, entryId, uri, durationMs, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-		[newId('seg'), entryId, uri, durationMs, nextOrder, Date.now()],
+		[segId, entryId, uri, durationMs, nextOrder, Date.now()],
 	);
 	const entry = await db.getFirstAsync('SELECT * FROM entries WHERE id = ?', [
 		entryId,
@@ -164,7 +183,14 @@ export async function appendSegment(entryId, { uri, durationMs, waveform }) {
 		'UPDATE entries SET totalDurationMs = totalDurationMs + ?, waveform = ?, updatedAt = ?, transcript = NULL, transcriptStatus = ? WHERE id = ?',
 		[durationMs, JSON.stringify(mergedWaveform), Date.now(), 'stale', entryId],
 	);
-	mirrorToExternalFolder(uri, entry.title);
+	mirrorToExternalFolder(uri, entry.title).then((externalUri) => {
+		if (externalUri) {
+			db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [
+				externalUri,
+				segId,
+			]);
+		}
+	});
 }
 
 // Used after a trim/merge/append operation produces one real consolidated audio file:
@@ -230,8 +256,32 @@ export async function setTranscriptStatus(id, status) {
 	]);
 }
 
-export async function deleteEntries(ids) {
+// Returns the mirrored-copy URIs (skipping segments that were never mirrored) for the given
+// entry ids. Used by the delete flow to decide whether it's worth asking "also delete the
+// copies in <folder>?" - if this comes back empty, none of the entries have an external copy to
+// worry about, so the extra prompt is skipped entirely.
+export async function getExternalUrisForEntries(ids) {
+	if (!ids.length) return [];
 	const db = await getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	const rows = await db.getAllAsync(
+		`SELECT externalUri FROM segments WHERE entryId IN (${placeholders}) AND externalUri IS NOT NULL`,
+		ids,
+	);
+	return rows.map((r) => r.externalUri);
+}
+
+// alsoDeleteExternal: when true, also deletes each segment's mirrored copy (if any) from the
+// user's Saving folder - best-effort per file, same as mirroring itself. The app's own copy is
+// always removed either way; this only controls the extra, user-visible copy outside the app.
+export async function deleteEntries(ids, { alsoDeleteExternal = false } = {}) {
+	const db = await getDb();
+	if (alsoDeleteExternal) {
+		const externalUris = await getExternalUrisForEntries(ids);
+		for (const uri of externalUris) {
+			await deleteFileByUri(uri);
+		}
+	}
 	for (const id of ids) {
 		await db.runAsync('DELETE FROM entries WHERE id = ?', [id]);
 		await db.runAsync('DELETE FROM segments WHERE entryId = ?', [id]);
