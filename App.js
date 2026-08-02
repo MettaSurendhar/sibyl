@@ -9,11 +9,16 @@ import { AlertProvider } from './src/theme/AlertContext';
 import { getDb } from './src/db/database';
 import BottomTabs from './src/navigation/BottomTabs';
 import PlaybackScreen from './src/screens/PlaybackScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
 import TrimScreen from './src/screens/TrimScreen';
 import MergeScreen from './src/screens/MergeScreen';
 import AppendScreen from './src/screens/AppendScreen';
+import SettingsHomeScreen from './src/screens/settings/SettingsHomeScreen';
+import RecordingSettingsScreen from './src/screens/settings/RecordingSettingsScreen';
+import NamingTagsSettingsScreen from './src/screens/settings/NamingTagsSettingsScreen';
+import AppearanceSettingsScreen from './src/screens/settings/AppearanceSettingsScreen';
+import TranscriptionSettingsScreen from './src/screens/settings/TranscriptionSettingsScreen';
+import AboutSettingsScreen from './src/screens/settings/AboutSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -54,7 +59,27 @@ function Root() {
 				/>
 				<Stack.Screen
 					name='Settings'
-					component={SettingsScreen}
+					component={SettingsHomeScreen}
+				/>
+				<Stack.Screen
+					name='RecordingSettings'
+					component={RecordingSettingsScreen}
+				/>
+				<Stack.Screen
+					name='NamingTagsSettings'
+					component={NamingTagsSettingsScreen}
+				/>
+				<Stack.Screen
+					name='AppearanceSettings'
+					component={AppearanceSettingsScreen}
+				/>
+				<Stack.Screen
+					name='TranscriptionSettings'
+					component={TranscriptionSettingsScreen}
+				/>
+				<Stack.Screen
+					name='AboutSettings'
+					component={AboutSettingsScreen}
 				/>
 				<Stack.Screen
 					name='Categories'
