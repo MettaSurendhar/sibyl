@@ -76,3 +76,17 @@ export async function copyFileToFolder(
 	});
 	return fileUri;
 }
+
+// Deletes a single file previously created via copyFileToFolder/writeTextFileToFolder, given its
+// own content:// URI (not the parent directory's). Used when the user deletes a recording from
+// the app and chooses to also remove its mirrored copy. Best-effort: if the file was already
+// removed by hand, or the folder's permission was revoked, this just no-ops rather than throwing -
+// there's nothing more the app can do about a copy it no longer has access to.
+export async function deleteFileByUri(fileUri) {
+	if (!isExternalFolderSupported() || !fileUri) return;
+	try {
+		await SAF.deleteAsync(fileUri);
+	} catch (e) {
+		// already gone / permission revoked - nothing more to do
+	}
+}
