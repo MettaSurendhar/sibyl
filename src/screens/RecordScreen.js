@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system';
 import { useTheme } from '../theme/ThemeContext';
 import { useAlert } from '../theme/AlertContext';
 import { LiveWaveform, WaveformRuler } from '../components/Waveform';
+import HomeHeader from '../components/HomeHeader';
 import { createRecorder } from '../audio/recorder';
 import {
 	listCategories,
@@ -207,6 +208,8 @@ export default function RecordScreen({ navigation }) {
 				{ backgroundColor: theme.bg, paddingTop: insets.top + 20 },
 			]}
 		>
+			{status === 'idle' && <HomeHeader navigation={navigation} />}
+
 			<Text style={[styles.sessionTitle, { color: theme.textMuted }]}>
 				{status === 'idle' ? 'Ready to record' : `Recording #${sessionNumber}`}
 			</Text>
