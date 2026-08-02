@@ -65,6 +65,18 @@ export async function getDb() {
 		// column already exists
 	}
 
+	// migration: externalUri column (added so deleting a recording can also offer to delete its
+	// mirrored copy in the user's chosen Saving folder, if one was made) - ignore if it already
+	// exists. NULL means "no mirrored copy exists for this segment" (folder wasn't connected yet,
+	// mirroring failed, or it hasn't been backfilled).
+	try {
+		await dbInstance.execAsync(
+			'ALTER TABLE segments ADD COLUMN externalUri TEXT',
+		);
+	} catch (e) {
+		// column already exists
+	}
+
 	// seed default categories on first run
 	const row = await dbInstance.getFirstAsync(
 		'SELECT COUNT(*) as c FROM categories',
