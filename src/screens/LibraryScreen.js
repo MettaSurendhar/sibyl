@@ -13,7 +13,6 @@ import {
 	Pressable,
 	SectionList,
 	StyleSheet,
-	Alert,
 	BackHandler,
 	LayoutAnimation,
 	Platform,
@@ -23,6 +22,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
+import { useAlert } from '../theme/AlertContext';
 import { useTheme } from '../theme/ThemeContext';
 import { listEntries, deleteEntries, renameEntry } from '../db/entries';
 import { listCategories } from '../db/categories';
@@ -44,6 +44,7 @@ const EMPTY_FILTER = { tagIds: [], datePreset: null, customRange: null };
 
 export default function LibraryScreen({ navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const [entries, setEntries] = useState([]);
 	const [categories, setCategories] = useState([]);
@@ -227,7 +228,7 @@ export default function LibraryScreen({ navigation }) {
 		const entry = entries.find((e) => e.id === selectedIds[0]);
 		const uri = entry?.segments[entry.segments.length - 1]?.uri;
 		if (uri && (await Sharing.isAvailableAsync())) {
-			Alert.alert(
+			alert(
 				'Set as ringtone',
 				'Choose "Set as ringtone" from the share sheet, or save and set it from Sound settings.',
 			);
