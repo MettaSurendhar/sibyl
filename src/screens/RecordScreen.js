@@ -4,7 +4,6 @@ import {
 	Text,
 	TouchableOpacity,
 	StyleSheet,
-	Alert,
 	BackHandler,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import { LiveWaveform, WaveformRuler } from '../components/Waveform';
 import { createRecorder } from '../audio/recorder';
 import {
@@ -23,6 +23,12 @@ import {
 	totalEntryCount,
 } from '../db/categories';
 import { createEntry } from '../db/entries';
+import {
+	getRecordingsFolderUri,
+	getFolderHintDismissed,
+	setFolderHintDismissed,
+} from '../utils/settingsStore';
+import { isExternalFolderSupported } from '../utils/externalFolder';
 import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -36,6 +42,7 @@ function formatCentis(ms) {
 
 export default function RecordScreen({ navigation }) {
 	const { theme } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const [status, setStatus] = useState('idle'); // idle | recording | paused
 	const [elapsedMs, setElapsedMs] = useState(0);
@@ -44,6 +51,7 @@ export default function RecordScreen({ navigation }) {
 	const [sheetVisible, setSheetVisible] = useState(false);
 	const [sessionNumber, setSessionNumber] = useState(1);
 	const [discardModalVisible, setDiscardModalVisible] = useState(false);
+	const [folderHintVisible, setFolderHintVisible] = useState(false);
 	const recorderRef = useRef(null);
 	const pendingResultRef = useRef(null);
 
@@ -82,6 +90,24 @@ export default function RecordScreen({ navigation }) {
 		setElapsedMs(0);
 	}
 
+	// Nudges the user, once per recording session at most, to connect a Saving folder if they
+	// haven't - only relevant on Android (see externalFolder.js) and only if they haven't already
+	// permanently dismissed it. Recordings are always safely stored in the app's own local
+	// storage regardless; this is purely about the optional visible-outside-the-app copy.
+	async function maybeShowFolderHint() {
+		if (!isExternalFolderSupported()) return;
+		const folderUri = await getRecordingsFolderUri();
+		if (folderUri) return;
+		const dismissed = await getFolderHintDismissed();
+		if (dismissed) return;
+		setFolderHintVisible(true);
+	}
+
+	async function dismissFolderHint() {
+		setFolderHintVisible(false);
+		await setFolderHintDismissed(true);
+	}
+
 	async function handleStart() {
 		recorderRef.current = createRecorder({
 			// expo-av's metering callback isn't guaranteed to fire exactly every 100ms - under load
@@ -106,8 +132,9 @@ export default function RecordScreen({ navigation }) {
 			setStatus('recording');
 			setSamples([]);
 			setElapsedMs(0);
+			maybeShowFolderHint();
 		} catch (e) {
-			Alert.alert('Could not start recording', e.message);
+			alert('Could not start recording', e.message);
 		}
 	}
 
@@ -183,6 +210,49 @@ export default function RecordScreen({ navigation }) {
 			<Text style={[styles.sessionTitle, { color: theme.textMuted }]}>
 				{status === 'idle' ? 'Ready to record' : `Recording #${sessionNumber}`}
 			</Text>
+
+			{folderHintVisible && status !== 'idle' && (
+				<View
+					style={[
+						styles.folderHint,
+						{ backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+					]}
+				>
+					<Feather
+						name='folder'
+						size={16}
+						color={theme.textMuted}
+						style={{ marginRight: 8, marginTop: 1 }}
+					/>
+					<Text
+						style={{
+							color: theme.textMuted,
+							fontSize: 12,
+							flex: 1,
+							lineHeight: 17,
+						}}
+					>
+						This recording is only saved on your device.{' '}
+						<Text
+							style={{ color: theme.accent, fontWeight: '700' }}
+							onPress={() => navigation.navigate('Settings')}
+						>
+							Connect a saving folder
+						</Text>{' '}
+						to also keep a copy in your files.
+					</Text>
+					<TouchableOpacity
+						onPress={dismissFolderHint}
+						style={{ padding: 4, marginLeft: 4 }}
+					>
+						<Feather
+							name='x'
+							size={16}
+							color={theme.textMuted}
+						/>
+					</TouchableOpacity>
+				</View>
+			)}
 
 			<View style={styles.middle}>
 				<View style={styles.waveformWrap}>
@@ -288,6 +358,15 @@ export default function RecordScreen({ navigation }) {
 const styles = StyleSheet.create({
 	container: { flex: 1, alignItems: 'center', paddingHorizontal: 24 },
 	sessionTitle: { fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
+	folderHint: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 10,
+		marginTop: 14,
+		width: '100%',
+	},
 	middle: {
 		flex: 1,
 		width: '100%',
