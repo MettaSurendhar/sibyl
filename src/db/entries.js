@@ -30,6 +30,46 @@ async function mirrorToExternalFolder(uri, title) {
 	}
 }
 
+// Copies every recording currently in the app's local storage into a chosen external folder.
+// Used from Settings both right after picking a new Saving folder (offered immediately) and
+// on-demand later via the same button, e.g. if the user skipped it the first time or reconnected
+// a folder. Each segment across every entry is copied individually - same per-file approach
+// mirrorToExternalFolder already uses for new recordings going forward. Best-effort per file: one
+// failure doesn't stop the rest. onProgress (optional) fires after each attempt with
+// { done, total } for a live "Copying x/y" indicator; the final { copied, failed, total } lets
+// the caller show a summary.
+export async function backfillRecordingsToFolder(folderUri, onProgress) {
+	const db = await getDb();
+	const segments = await db.getAllAsync(`
+    SELECT s.uri as uri, e.title as title
+    FROM segments s
+    JOIN entries e ON e.id = s.entryId
+    ORDER BY s.createdAt ASC
+  `);
+	let copied = 0;
+	let failed = 0;
+	const total = segments.length;
+	for (const seg of segments) {
+		try {
+			const ext = (seg.uri.split('.').pop() || 'm4a').split('?')[0];
+			const safeTitle =
+				(seg.title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() ||
+				'recording';
+			await copyFileToFolder(
+				folderUri,
+				seg.uri,
+				`${safeTitle}.${ext}`,
+				`audio/${ext}`,
+			);
+			copied++;
+		} catch (e) {
+			failed++;
+		}
+		if (onProgress) onProgress({ done: copied + failed, total });
+	}
+	return { copied, failed, total };
+}
+
 // Returns entries with their segments and category joined, grouped-ready (sorted newest first)
 export async function listEntries() {
 	const db = await getDb();
