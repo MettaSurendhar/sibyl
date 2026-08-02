@@ -67,3 +67,21 @@ export async function setTranscriptFolderUri(uri) {
 		await AsyncStorage.setItem(TRANSCRIPT_FOLDER_KEY, uri);
 	}
 }
+
+// Whether the user has dismissed RecordScreen's "connect a saving folder" hint (shown while
+// recording, only when no recordings folder is configured yet). One dismissal sticks - the hint
+// doesn't reappear on every future recording, since Settings remains available to connect one
+// anytime.
+const FOLDER_HINT_DISMISSED_KEY = '@voice_journal_folder_hint_dismissed';
+
+export async function getFolderHintDismissed() {
+	return (await AsyncStorage.getItem(FOLDER_HINT_DISMISSED_KEY)) === '1';
+}
+
+export async function setFolderHintDismissed(dismissed) {
+	if (dismissed) {
+		await AsyncStorage.setItem(FOLDER_HINT_DISMISSED_KEY, '1');
+	} else {
+		await AsyncStorage.removeItem(FOLDER_HINT_DISMISSED_KEY);
+	}
+}
