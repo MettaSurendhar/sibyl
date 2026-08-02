@@ -24,8 +24,18 @@ import { Feather } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useAlert } from '../theme/AlertContext';
 import { useTheme } from '../theme/ThemeContext';
-import { listEntries, deleteEntries, renameEntry } from '../db/entries';
+import {
+	listEntries,
+	deleteEntries,
+	renameEntry,
+	getExternalUrisForEntries,
+} from '../db/entries';
 import { listCategories } from '../db/categories';
+import { getRecordingsFolderUri } from '../utils/settingsStore';
+import {
+	folderDisplayName,
+	isExternalFolderSupported,
+} from '../utils/externalFolder';
 import { groupByDate, dateRangeForPreset } from '../utils/format';
 import EntryRow from '../components/EntryRow';
 import PromptModal from '../components/PromptModal';
@@ -60,6 +70,9 @@ export default function LibraryScreen({ navigation }) {
 	const [playbackPos, setPlaybackPos] = useState(0);
 	const [renamePromptVisible, setRenamePromptVisible] = useState(false);
 	const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+	const [deleteFromFolderModalVisible, setDeleteFromFolderModalVisible] =
+		useState(false);
+	const [folderNameForDelete, setFolderNameForDelete] = useState('');
 	const playerRef = useRef(null);
 
 	const refresh = useCallback(() => {
@@ -195,7 +208,24 @@ export default function LibraryScreen({ navigation }) {
 
 	async function confirmDelete() {
 		setDeleteModalVisible(false);
+		const folderUri = await getRecordingsFolderUri();
+		if (isExternalFolderSupported() && folderUri) {
+			const externalUris = await getExternalUrisForEntries(selectedIds);
+			if (externalUris.length > 0) {
+				setFolderNameForDelete(folderDisplayName(folderUri));
+				setDeleteFromFolderModalVisible(true);
+				return;
+			}
+		}
 		await deleteEntries(selectedIds);
+		setSelectedIds([]);
+		setEditMode(false);
+		refresh();
+	}
+
+	async function finishDelete(alsoDeleteExternal) {
+		setDeleteFromFolderModalVisible(false);
+		await deleteEntries(selectedIds, { alsoDeleteExternal });
 		setSelectedIds([]);
 		setEditMode(false);
 		refresh();
@@ -582,6 +612,17 @@ export default function LibraryScreen({ navigation }) {
 				destructive
 				onCancel={() => setDeleteModalVisible(false)}
 				onConfirm={confirmDelete}
+			/>
+
+			<ConfirmModal
+				visible={deleteFromFolderModalVisible}
+				title='Also delete from folder?'
+				message={`${selectedIds.length === 1 ? 'This recording is' : 'These recordings are'} also saved in ${folderNameForDelete}. Delete the cop${selectedIds.length === 1 ? 'y' : 'ies'} there too?`}
+				confirmLabel='Delete'
+				cancelLabel='Keep copies'
+				destructive
+				onCancel={() => finishDelete(false)}
+				onConfirm={() => finishDelete(true)}
 			/>
 		</View>
 	);

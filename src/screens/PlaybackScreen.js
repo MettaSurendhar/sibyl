@@ -32,16 +32,19 @@ import {
 	setTranscript,
 	setTranscriptStatus,
 	setEntryCategory,
+	getExternalUrisForEntries,
 } from '../db/entries';
 import { listCategories, nextNameForCategory } from '../db/categories';
 import {
 	getGroqApiKey,
+	getRecordingsFolderUri,
 	getTranscriptFolderUri,
 	setTranscriptFolderUri,
 } from '../utils/settingsStore';
 import {
 	pickFolder,
 	writeTextFileToFolder,
+	folderDisplayName,
 	isExternalFolderSupported,
 } from '../utils/externalFolder';
 import { transcribeSegments, languageDisplayName } from '../groq/transcribe';
@@ -72,6 +75,9 @@ export default function PlaybackScreen({ route, navigation }) {
 	const [page, setPage] = useState(0); // 0 = Playback, 1 = Transcribe
 	const [renamePromptVisible, setRenamePromptVisible] = useState(false);
 	const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+	const [deleteFromFolderModalVisible, setDeleteFromFolderModalVisible] =
+		useState(false);
+	const [folderNameForDelete, setFolderNameForDelete] = useState('');
 	const playerRef = useRef(null);
 	const entryRef = useRef(null);
 	const pagerRef = useRef(null);
@@ -236,7 +242,22 @@ export default function PlaybackScreen({ route, navigation }) {
 
 	async function confirmDelete() {
 		setDeleteModalVisible(false);
+		const folderUri = await getRecordingsFolderUri();
+		if (isExternalFolderSupported() && folderUri) {
+			const externalUris = await getExternalUrisForEntries([entry.id]);
+			if (externalUris.length > 0) {
+				setFolderNameForDelete(folderDisplayName(folderUri));
+				setDeleteFromFolderModalVisible(true);
+				return;
+			}
+		}
 		await deleteEntries([entry.id]);
+		navigation.goBack();
+	}
+
+	async function finishDelete(alsoDeleteExternal) {
+		setDeleteFromFolderModalVisible(false);
+		await deleteEntries([entry.id], { alsoDeleteExternal });
 		navigation.goBack();
 	}
 
@@ -889,6 +910,17 @@ export default function PlaybackScreen({ route, navigation }) {
 				destructive
 				onCancel={() => setDeleteModalVisible(false)}
 				onConfirm={confirmDelete}
+			/>
+
+			<ConfirmModal
+				visible={deleteFromFolderModalVisible}
+				title='Also delete from folder?'
+				message={`This recording is also saved in ${folderNameForDelete}. Delete the copy there too?`}
+				confirmLabel='Delete'
+				cancelLabel='Keep copy'
+				destructive
+				onCancel={() => finishDelete(false)}
+				onConfirm={() => finishDelete(true)}
 			/>
 		</View>
 	);
