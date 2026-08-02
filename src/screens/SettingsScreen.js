@@ -7,13 +7,14 @@ import {
 	ScrollView,
 	StyleSheet,
 	Linking,
-	Alert,
 	Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { useAlert } from '../theme/AlertContext';
 import { themeList } from '../theme/themes';
+import ConfirmModal from '../components/ConfirmModal';
 import {
 	getGroqApiKey,
 	setGroqApiKey,
@@ -21,12 +22,15 @@ import {
 	setPrefs,
 	getRecordingsFolderUri,
 	setRecordingsFolderUri,
+	getTranscriptFolderUri,
+	setTranscriptFolderUri,
 } from '../utils/settingsStore';
 import {
 	pickFolder,
 	folderDisplayName,
 	isExternalFolderSupported,
 } from '../utils/externalFolder';
+import { backfillRecordingsToFolder } from '../db/entries';
 import {
 	getUntaggedTemplate,
 	setUntaggedTemplate,
@@ -47,6 +51,7 @@ const FORMATS = [
 
 export default function SettingsScreen({ navigation }) {
 	const { theme, themeKey, setThemeKey } = useTheme();
+	const alert = useAlert();
 	const insets = useSafeAreaInsets();
 	const [apiKey, setApiKey] = useState('');
 	const [prefs, setPrefsState] = useState({ recordingFormat: 'aac' });
@@ -55,6 +60,13 @@ export default function SettingsScreen({ navigation }) {
 	const [mergeTemplate, setMergeTemplateState] = useState('');
 	const [appendTemplate, setAppendTemplateState] = useState('');
 	const [recordingsFolderUri, setRecordingsFolderUriState] = useState(null);
+	const [transcriptFolderUri, setTranscriptFolderUriState] = useState(null);
+	const [backfillModalVisible, setBackfillModalVisible] = useState(false);
+	const [backfilling, setBackfilling] = useState(false);
+	const [backfillProgress, setBackfillProgress] = useState({
+		done: 0,
+		total: 0,
+	});
 
 	useEffect(() => {
 		getGroqApiKey().then((k) => setApiKey(k || ''));
@@ -64,6 +76,7 @@ export default function SettingsScreen({ navigation }) {
 		getMergeTemplate().then(setMergeTemplateState);
 		getAppendTemplate().then(setAppendTemplateState);
 		getRecordingsFolderUri().then(setRecordingsFolderUriState);
+		getTranscriptFolderUri().then(setTranscriptFolderUriState);
 	}, []);
 
 	async function saveApiKey(text) {
@@ -98,7 +111,7 @@ export default function SettingsScreen({ navigation }) {
 
 	async function chooseRecordingsFolder() {
 		if (!isExternalFolderSupported()) {
-			Alert.alert(
+			alert(
 				'Not available on iOS',
 				'Choosing a save folder uses an Android-only system feature. On iOS, use the Share button on a recording to save it to Files instead.',
 			);
@@ -108,12 +121,63 @@ export default function SettingsScreen({ navigation }) {
 		if (picked) {
 			await setRecordingsFolderUri(picked);
 			setRecordingsFolderUriState(picked);
+			// New/changed folder only mirrors recordings made from here on - offer to back-copy
+			// everything already sitting in local storage too, so nothing's left behind.
+			setBackfillModalVisible(true);
 		}
 	}
 
 	async function clearRecordingsFolder() {
 		await setRecordingsFolderUri(null);
 		setRecordingsFolderUriState(null);
+	}
+
+	async function runBackfill() {
+		setBackfillModalVisible(false);
+		if (!recordingsFolderUri) return;
+		setBackfilling(true);
+		setBackfillProgress({ done: 0, total: 0 });
+		const result = await backfillRecordingsToFolder(
+			recordingsFolderUri,
+			setBackfillProgress,
+		);
+		setBackfilling(false);
+		if (result.total === 0) {
+			alert(
+				'Nothing to copy',
+				"You don't have any recordings saved locally yet.",
+			);
+		} else if (result.failed > 0) {
+			alert(
+				'Copy finished',
+				`Copied ${result.copied} of ${result.total} recording${result.total === 1 ? '' : 's'}. ${result.failed} couldn't be copied.`,
+			);
+		} else {
+			alert(
+				'Copy finished',
+				`Copied ${result.copied} recording${result.copied === 1 ? '' : 's'} to your chosen folder.`,
+			);
+		}
+	}
+
+	async function chooseTranscriptFolder() {
+		if (!isExternalFolderSupported()) {
+			alert(
+				'Not available on iOS',
+				'Choosing a folder uses an Android-only system feature. On iOS, use the Share button on a transcript to save it via Files instead.',
+			);
+			return;
+		}
+		const picked = await pickFolder();
+		if (picked) {
+			await setTranscriptFolderUri(picked);
+			setTranscriptFolderUriState(picked);
+		}
+	}
+
+	async function clearTranscriptFolder() {
+		await setTranscriptFolderUri(null);
+		setTranscriptFolderUriState(null);
 	}
 
 	return (
@@ -296,7 +360,7 @@ export default function SettingsScreen({ navigation }) {
 			</Section>
 
 			<Section
-				title='Saving folder'
+				title='Recordings saving folder'
 				theme={theme}
 			>
 				<Text style={{ color: theme.textMuted, marginBottom: 8, fontSize: 13 }}>
@@ -334,12 +398,96 @@ export default function SettingsScreen({ navigation }) {
 					/>
 				</TouchableOpacity>
 				{!!recordingsFolderUri && (
+					<>
+						<TouchableOpacity
+							onPress={clearRecordingsFolder}
+							style={{ marginTop: 10 }}
+						>
+							<Text style={{ color: theme.textMuted, fontSize: 13 }}>
+								Stop mirroring to this folder
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							disabled={backfilling}
+							onPress={() => setBackfillModalVisible(true)}
+							style={[
+								styles.navButton,
+								{
+									backgroundColor: theme.surfaceAlt,
+									borderColor: theme.border,
+									marginTop: 12,
+									opacity: backfilling ? 0.6 : 1,
+								},
+							]}
+						>
+							<Feather
+								name='upload'
+								size={18}
+								color={theme.text}
+								style={{ marginRight: 10 }}
+							/>
+							<Text style={{ color: theme.text, flex: 1, fontWeight: '600' }}>
+								{backfilling
+									? `Copying ${backfillProgress.done}/${backfillProgress.total}…`
+									: 'Copy existing recordings to this folder'}
+							</Text>
+						</TouchableOpacity>
+						<Text
+							style={{ color: theme.textMuted, marginTop: 6, fontSize: 12 }}
+						>
+							Copies everything already saved locally, not just new recordings.
+							Running it again on the same folder may create duplicates for
+							files already copied.
+						</Text>
+					</>
+				)}
+			</Section>
+
+			<Section
+				title='Transcript downloads folder'
+				theme={theme}
+			>
+				<Text style={{ color: theme.textMuted, marginBottom: 8, fontSize: 13 }}>
+					Optional. Where the download button on a transcript saves its .txt
+					file. You're asked to pick one the first time you download a
+					transcript if you haven't set one here - this lets you set or change
+					it anytime.
+					{Platform.OS !== 'android' && ' Android only, for now.'}
+				</Text>
+				<TouchableOpacity
+					style={[
+						styles.navButton,
+						{ backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+					]}
+					onPress={chooseTranscriptFolder}
+				>
+					<Feather
+						name='file-text'
+						size={18}
+						color={theme.text}
+						style={{ marginRight: 10 }}
+					/>
+					<Text
+						style={{ color: theme.text, flex: 1, fontWeight: '600' }}
+						numberOfLines={1}
+					>
+						{transcriptFolderUri
+							? folderDisplayName(transcriptFolderUri)
+							: 'Choose a folder'}
+					</Text>
+					<Feather
+						name='chevron-right'
+						size={18}
+						color={theme.textMuted}
+					/>
+				</TouchableOpacity>
+				{!!transcriptFolderUri && (
 					<TouchableOpacity
-						onPress={clearRecordingsFolder}
+						onPress={clearTranscriptFolder}
 						style={{ marginTop: 10 }}
 					>
 						<Text style={{ color: theme.textMuted, fontSize: 13 }}>
-							Stop mirroring to this folder
+							Ask again next time I download a transcript
 						</Text>
 					</TouchableOpacity>
 				)}
@@ -412,6 +560,16 @@ export default function SettingsScreen({ navigation }) {
 					device.
 				</Text>
 			</Section>
+
+			<ConfirmModal
+				visible={backfillModalVisible}
+				title='Copy existing recordings?'
+				message="This copies every recording you already have saved locally into the folder you just chose, so nothing's left behind. New recordings will keep mirroring here automatically either way."
+				confirmLabel='Copy now'
+				cancelLabel='Not now'
+				onCancel={() => setBackfillModalVisible(false)}
+				onConfirm={runBackfill}
+			/>
 		</ScrollView>
 	);
 }
