@@ -1,19 +1,22 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  Pressable,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  BackHandler,
+	View,
+	Text,
+	TouchableOpacity,
+	Pressable,
+	StyleSheet,
+	Alert,
+	ScrollView,
+	BackHandler,
+	useWindowDimensions,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../theme/ThemeContext';
 import { ScrollingPlaybackTrack } from '../components/Waveform';
 import PromptModal from '../components/PromptModal';
@@ -23,444 +26,962 @@ import EntryTagSheet from '../components/EntryTagSheet';
 import { createPlayer } from '../audio/player';
 import { formatDuration } from '../utils/format';
 import {
-  getEntry,
-  renameEntry,
-  deleteEntries,
-  setTranscript,
-  setTranscriptStatus,
-  setEntryCategory,
+	getEntry,
+	renameEntry,
+	deleteEntries,
+	setTranscript,
+	setTranscriptStatus,
+	setEntryCategory,
 } from '../db/entries';
 import { listCategories, nextNameForCategory } from '../db/categories';
-import { getGroqApiKey } from '../utils/settingsStore';
-import { transcribeSegments } from '../groq/transcribe';
+import {
+	getGroqApiKey,
+	getTranscriptFolderUri,
+	setTranscriptFolderUri,
+} from '../utils/settingsStore';
+import {
+	pickFolder,
+	writeTextFileToFolder,
+	isExternalFolderSupported,
+} from '../utils/externalFolder';
+import { transcribeSegments, languageDisplayName } from '../groq/transcribe';
+
+// Page 2's "no API key" case is by far the most common failure - give it a distinct sentinel
+// so the warning under the Transcribe button can show a tappable Settings link instead of a
+// plain error string.
+const NO_API_KEY = 'no-api-key';
 
 export default function PlaybackScreen({ route, navigation }) {
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { entryId } = route.params;
-  const [entry, setEntry] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [positionMs, setPositionMs] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1.0);
-  const [skipSilence, setSkipSilence] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [editMenuOpen, setEditMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tagSheetOpen, setTagSheetOpen] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [renamePromptVisible, setRenamePromptVisible] = useState(false);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const playerRef = useRef(null);
-  const entryRef = useRef(null);
+	const { theme } = useTheme();
+	const insets = useSafeAreaInsets();
+	const { width } = useWindowDimensions();
+	const { entryId } = route.params;
+	const [entry, setEntry] = useState(null);
+	const [categories, setCategories] = useState([]);
+	const [positionMs, setPositionMs] = useState(0);
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [speed, setSpeed] = useState(1.0);
+	const [skipSilence, setSkipSilence] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [editMenuOpen, setEditMenuOpen] = useState(false);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [tagSheetOpen, setTagSheetOpen] = useState(false);
+	const [transcribing, setTranscribing] = useState(false);
+	const [transcribeError, setTranscribeError] = useState('');
+	const [page, setPage] = useState(0); // 0 = Playback, 1 = Transcribe
+	const [renamePromptVisible, setRenamePromptVisible] = useState(false);
+	const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+	const playerRef = useRef(null);
+	const entryRef = useRef(null);
+	const pagerRef = useRef(null);
 
-  const load = useCallback(async () => {
-    const e = await getEntry(entryId);
-    setEntry(e);
-    entryRef.current = e;
-    return e;
-  }, [entryId]);
+	const load = useCallback(async () => {
+		const e = await getEntry(entryId);
+		setEntry(e);
+		entryRef.current = e;
+		return e;
+	}, [entryId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      listCategories().then(setCategories);
-      load().then((e) => {
-        if (cancelled || !e) return;
-        playerRef.current = createPlayer({
-          segments: e.segments,
-          onStatus: (s) => {
-            setPositionMs(s.positionMs);
-            if (s.finished) setIsPlaying(false);
-          },
-        });
-      });
-      return () => {
-        cancelled = true;
-        playerRef.current?.unload();
-        playerRef.current = null;
-      };
-    }, [load])
-  );
+	useFocusEffect(
+		useCallback(() => {
+			let cancelled = false;
+			listCategories().then(setCategories);
+			load().then((e) => {
+				if (cancelled || !e) return;
+				playerRef.current = createPlayer({
+					segments: e.segments,
+					onStatus: (s) => {
+						setPositionMs(s.positionMs);
+						if (s.finished) setIsPlaying(false);
+					},
+				});
+			});
+			return () => {
+				cancelled = true;
+				playerRef.current?.unload();
+				playerRef.current = null;
+			};
+		}, [load]),
+	);
 
-  // These two dropdowns are plain Views (not RN Modal), so unlike the sheet modals below,
-  // Android's back button/gesture won't auto-close them - handle that explicitly.
-  useFocusEffect(
-    useCallback(() => {
-      const onBack = () => {
-        if (menuOpen) {
-          setMenuOpen(false);
-          return true;
-        }
-        if (editMenuOpen) {
-          setEditMenuOpen(false);
-          return true;
-        }
-        return false;
-      };
-      const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
-      return () => sub.remove();
-    }, [menuOpen, editMenuOpen])
-  );
+	// Reset to the Playback page and clear any stale transcription error whenever a fresh entry
+	// is focused, so navigating Library -> entry A -> back -> entry B doesn't land on B already
+	// scrolled to page 2 or showing A's error message.
+	useFocusEffect(
+		useCallback(() => {
+			pagerRef.current?.scrollTo({ x: 0, animated: false });
+			setPage(0);
+			setTranscribeError('');
+		}, [entryId]),
+	);
 
-  if (!entry) {
-    return <View style={[styles.container, { backgroundColor: theme.bg }]} />;
-  }
+	function goToPlaybackPage() {
+		pagerRef.current?.scrollTo({ x: 0, animated: true });
+	}
 
-  async function togglePlay() {
-    if (isPlaying) {
-      await playerRef.current?.pause();
-      setIsPlaying(false);
-    } else {
-      await playerRef.current?.play();
-      setIsPlaying(true);
-    }
-  }
+	function goToTranscribePage() {
+		pagerRef.current?.scrollTo({ x: width, animated: true });
+	}
 
-  async function skip(deltaMs) {
-    await playerRef.current?.skip(deltaMs);
-  }
+	function onPagerScroll(e) {
+		const x = e.nativeEvent.contentOffset.x;
+		setPage(x >= width / 2 ? 1 : 0);
+	}
 
-  async function seekTo(ms) {
-    await playerRef.current?.seek(ms);
-    setPositionMs(ms);
-  }
+	// These dropdowns/pages aren't RN Modal components, so unlike the sheet modals below, Android's
+	// back button/gesture won't auto-close/navigate them - handle that explicitly. Priority:
+	// dropdowns first, then falling back from the Transcribe page to the Playback page, then the
+	// screen's default back behavior.
+	useFocusEffect(
+		useCallback(() => {
+			const onBack = () => {
+				if (menuOpen) {
+					setMenuOpen(false);
+					return true;
+				}
+				if (editMenuOpen) {
+					setEditMenuOpen(false);
+					return true;
+				}
+				if (page === 1) {
+					goToPlaybackPage();
+					return true;
+				}
+				return false;
+			};
+			const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+			return () => sub.remove();
+		}, [menuOpen, editMenuOpen, page]),
+	);
 
-  async function changeSpeed(newSpeed) {
-    setSpeed(newSpeed);
-    await playerRef.current?.setRate(newSpeed);
-  }
+	if (!entry) {
+		return <View style={[styles.container, { backgroundColor: theme.bg }]} />;
+	}
 
-  function toggleSkipSilence(next) {
-    setSkipSilence(next);
-    playerRef.current?.setSkipSilence(next, entry.waveform);
-  }
+	async function togglePlay() {
+		if (isPlaying) {
+			await playerRef.current?.pause();
+			setIsPlaying(false);
+		} else {
+			await playerRef.current?.play();
+			setIsPlaying(true);
+		}
+	}
 
-  // --- 3-dot menu actions ---
-  async function handleShare() {
-    setMenuOpen(false);
-    const lastUri = entry.segments[entry.segments.length - 1]?.uri;
-    if (lastUri && (await Sharing.isAvailableAsync())) await Sharing.shareAsync(lastUri);
-  }
+	async function skip(deltaMs) {
+		await playerRef.current?.skip(deltaMs);
+	}
 
-  function handleRename() {
-    setMenuOpen(false);
-    setRenamePromptVisible(true);
-  }
+	async function seekTo(ms) {
+		await playerRef.current?.seek(ms);
+		setPositionMs(ms);
+	}
 
-  async function submitRename(text) {
-    setRenamePromptVisible(false);
-    if (text) {
-      await renameEntry(entry.id, text);
-      load();
-    }
-  }
+	async function changeSpeed(newSpeed) {
+		setSpeed(newSpeed);
+		await playerRef.current?.setRate(newSpeed);
+	}
 
-  async function handleRingtone() {
-    setMenuOpen(false);
-    const lastUri = entry.segments[entry.segments.length - 1]?.uri;
-    if (lastUri && (await Sharing.isAvailableAsync())) {
-      Alert.alert('Set as ringtone', 'Choose "Set as ringtone" from the share sheet, or save and set it from Sound settings.');
-      await Sharing.shareAsync(lastUri);
-    }
-  }
+	function toggleSkipSilence(next) {
+		setSkipSilence(next);
+		playerRef.current?.setSkipSilence(next, entry.waveform);
+	}
 
-  function handleDetails() {
-    setMenuOpen(false);
-    Alert.alert(
-      'Details',
-      `Category: ${entry.categoryName || 'Untagged'}\nDuration: ${formatDuration(entry.totalDurationMs)}\nSegments: ${entry.segments.length}\nCreated: ${new Date(entry.createdAt).toLocaleString()}`
-    );
-  }
+	// --- 3-dot menu actions ---
+	async function handleShare() {
+		setMenuOpen(false);
+		const lastUri = entry.segments[entry.segments.length - 1]?.uri;
+		if (lastUri && (await Sharing.isAvailableAsync()))
+			await Sharing.shareAsync(lastUri);
+	}
 
-  function handleDelete() {
-    setMenuOpen(false);
-    setDeleteModalVisible(true);
-  }
+	function handleRename() {
+		setMenuOpen(false);
+		setRenamePromptVisible(true);
+	}
 
-  async function confirmDelete() {
-    setDeleteModalVisible(false);
-    await deleteEntries([entry.id]);
-    navigation.goBack();
-  }
+	async function submitRename(text) {
+		setRenamePromptVisible(false);
+		if (text) {
+			await renameEntry(entry.id, text);
+			load();
+		}
+	}
 
-  function handleOpenTag() {
-    setMenuOpen(false);
-    setTagSheetOpen(true);
-  }
+	async function handleRingtone() {
+		setMenuOpen(false);
+		const lastUri = entry.segments[entry.segments.length - 1]?.uri;
+		if (lastUri && (await Sharing.isAvailableAsync())) {
+			Alert.alert(
+				'Set as ringtone',
+				'Choose "Set as ringtone" from the share sheet, or save and set it from Sound settings.',
+			);
+			await Sharing.shareAsync(lastUri);
+		}
+	}
 
-  async function applyTagChange(categoryId) {
-    let title = entry.title;
-    if (categoryId && categoryId !== entry.categoryId) {
-      title = (await nextNameForCategory(categoryId)) || entry.title;
-    }
-    await setEntryCategory(entry.id, categoryId, title);
-    setTagSheetOpen(false);
-    load();
-    listCategories().then(setCategories);
-  }
+	function handleDetails() {
+		setMenuOpen(false);
+		Alert.alert(
+			'Details',
+			`Category: ${entry.categoryName || 'Untagged'}\nDuration: ${formatDuration(entry.totalDurationMs)}\nSegments: ${entry.segments.length}\nCreated: ${new Date(entry.createdAt).toLocaleString()}`,
+		);
+	}
 
-  async function handleTranscribe() {
-    setMenuOpen(false);
-    const apiKey = await getGroqApiKey();
-    if (!apiKey) {
-      Alert.alert('No Groq API key', 'Add your free Groq API key in Settings to enable transcription.');
-      return;
-    }
-    setTranscribing(true);
-    await setTranscriptStatus(entry.id, 'pending');
-    try {
-      const text = await transcribeSegments(entry.segments, apiKey);
-      await setTranscript(entry.id, text);
-      await load();
-      Alert.alert('Transcribed', text.slice(0, 400) + (text.length > 400 ? '…' : ''));
-    } catch (e) {
-      await setTranscriptStatus(entry.id, 'error');
-      Alert.alert('Transcription failed', e.message);
-    } finally {
-      setTranscribing(false);
-    }
-  }
+	function handleDelete() {
+		setMenuOpen(false);
+		setDeleteModalVisible(true);
+	}
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-          <Feather name="arrow-left" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.entryTitle, { color: theme.text }]} numberOfLines={1}>
-          {entry.title}
-        </Text>
-        <TouchableOpacity onPress={() => setMenuOpen((v) => !v)} style={styles.iconBtn}>
-          <Feather name="more-vertical" size={20} color={theme.text} />
-        </TouchableOpacity>
-      </View>
+	async function confirmDelete() {
+		setDeleteModalVisible(false);
+		await deleteEntries([entry.id]);
+		navigation.goBack();
+	}
 
-      {menuOpen && (
-        <>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
-          <View style={[styles.dropdown, { top: insets.top + 46, backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleShare}>
-              <Feather name="share-2" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleOpenTag}>
-              <Feather name="tag" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Tag</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleRename}>
-              <Feather name="edit-2" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Rename</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleRingtone}>
-              <Feather name="bell" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Set as ringtone</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleTranscribe}>
-              <Feather name="file-text" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>{transcribing ? 'Transcribing…' : 'Transcribe'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleDetails}>
-              <Feather name="info" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Details</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleDelete}>
-              <Feather name="trash-2" size={17} color="#E5605A" style={styles.dropdownIcon} />
-              <Text style={{ color: '#E5605A' }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+	function handleOpenTag() {
+		setMenuOpen(false);
+		setTagSheetOpen(true);
+	}
 
-      {editMenuOpen && (
-        <>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditMenuOpen(false)} />
-          <View style={[styles.dropdown, styles.editDropdown, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setEditMenuOpen(false);
-                navigation.navigate('Trim', { entryId: entry.id });
-              }}
-            >
-              <Feather name="crop" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Trim audio</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setEditMenuOpen(false);
-                navigation.navigate('Merge', { entryId: entry.id });
-              }}
-            >
-              <Feather name="git-merge" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Merge audio</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setEditMenuOpen(false);
-                navigation.navigate('Append', { entryId: entry.id });
-              }}
-            >
-              <Feather name="mic" size={17} color={theme.text} style={styles.dropdownIcon} />
-              <Text style={{ color: theme.text }}>Append recording</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+	async function applyTagChange(categoryId) {
+		let title = entry.title;
+		if (categoryId && categoryId !== entry.categoryId) {
+			title = (await nextNameForCategory(categoryId)) || entry.title;
+		}
+		await setEntryCategory(entry.id, categoryId, title);
+		setTagSheetOpen(false);
+		load();
+		listCategories().then(setCategories);
+	}
 
-      {/* Four sections: waveform+ruler gets 2/5, the rest split the remaining 3/5 */}
-      <View style={styles.quadrants}>
-        <View style={[styles.quadrant, styles.waveformQuadrant]}>
-          <View style={styles.waveformWrap}>
-            <ScrollingPlaybackTrack
-              waveform={entry.waveform}
-              positionMs={positionMs}
-              totalDurationMs={entry.totalDurationMs}
-              color={entry.categoryColor || theme.accent}
-              mutedColor={theme.waveformMuted}
-              height={190}
-              barWidth={3}
-              onSeek={seekTo}
-            />
-          </View>
-        </View>
+	// --- Transcription ---
+	// Shared by both trigger paths: the 3-dot menu's "Transcribe" action and the Transcribe page's
+	// own button. Both end up calling this, so there's one source of truth for transcribing/
+	// transcript/error state instead of two independent copies.
+	async function startTranscribe() {
+		setTranscribeError('');
+		const apiKey = await getGroqApiKey();
+		if (!apiKey) {
+			setTranscribeError(NO_API_KEY);
+			return;
+		}
+		setTranscribing(true);
+		await setTranscriptStatus(entry.id, 'pending');
+		try {
+			const { text, language } = await transcribeSegments(
+				entry.segments,
+				apiKey,
+			);
+			await setTranscript(entry.id, text, language);
+			await load();
+		} catch (e) {
+			setTranscribeError(e.message);
+			await setTranscriptStatus(entry.id, 'error');
+			await load();
+		} finally {
+			setTranscribing(false);
+		}
+	}
 
-        <View style={[styles.quadrant, styles.centerContent]}>
-          <Text style={[styles.bigTime, { color: theme.text }]}>{formatDuration(positionMs)}</Text>
-        </View>
+	function handleTranscribeFromMenu() {
+		setMenuOpen(false);
+		goToTranscribePage();
+		startTranscribe();
+	}
 
-        <View style={[styles.quadrant, styles.centerContent]}>
-          <Slider
-            style={{ width: '100%', height: 36 }}
-            minimumValue={0}
-            maximumValue={entry.totalDurationMs || 1}
-            value={positionMs}
-            minimumTrackTintColor={theme.accent}
-            maximumTrackTintColor={theme.waveformMuted}
-            thumbTintColor={theme.accent}
-            onSlidingComplete={seekTo}
-          />
-          <View style={styles.timeRow}>
-            <Text style={{ color: theme.textMuted, fontSize: 12 }}>{formatDuration(positionMs)}</Text>
-            <Text style={{ color: theme.textMuted, fontSize: 12 }}>{formatDuration(entry.totalDurationMs)}</Text>
-          </View>
-        </View>
+	// --- Transcript actions (copy / share / download) ---
+	function transcriptFilename() {
+		const safe =
+			(entry.title || 'transcript').replace(/[\\/:*?"<>|]/g, '_').trim() ||
+			'transcript';
+		return `${safe}.txt`;
+	}
 
-        <View style={[styles.quadrant, styles.centerContent]}>
-          <View style={styles.transportRow}>
-            <TouchableOpacity onPress={() => setSettingsOpen(true)} style={styles.iconBtn}>
-              <Feather name="sliders" size={22} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => skip(-5000)} style={styles.iconBtn}>
-              <MaterialIcons name="replay-5" size={28} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={togglePlay}
-              style={[styles.playPauseBtn, { backgroundColor: theme.accent }]}
-            >
-              <Feather name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" style={isPlaying ? undefined : { marginLeft: 3 }} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => skip(5000)} style={styles.iconBtn}>
-              <MaterialIcons name="forward-5" size={28} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setEditMenuOpen((v) => !v)} style={styles.iconBtn}>
-              <Feather name="scissors" size={20} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+	async function handleCopyTranscript() {
+		if (!entry.transcript) return;
+		await Clipboard.setStringAsync(entry.transcript);
+		Alert.alert('Copied', 'Transcript copied to clipboard.');
+	}
 
-      {entry.transcript && (
-        <ScrollView style={styles.transcriptScroll}>
-          <View style={[styles.transcriptBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={{ color: theme.textMuted, fontSize: 12, marginBottom: 4 }}>TRANSCRIPT</Text>
-            <Text style={{ color: theme.text }}>{entry.transcript}</Text>
-          </View>
-        </ScrollView>
-      )}
+	async function handleShareTranscript() {
+		if (!entry.transcript) return;
+		const fileUri = FileSystem.cacheDirectory + transcriptFilename();
+		await FileSystem.writeAsStringAsync(fileUri, entry.transcript, {
+			encoding: FileSystem.EncodingType.UTF8,
+		});
+		if (await Sharing.isAvailableAsync()) {
+			await Sharing.shareAsync(fileUri, {
+				mimeType: 'text/plain',
+				dialogTitle: 'Share transcript',
+			});
+		}
+	}
 
-      <PlaybackSettingsSheet
-        visible={settingsOpen}
-        speed={speed}
-        skipSilence={skipSilence}
-        onChangeSpeed={changeSpeed}
-        onToggleSkipSilence={toggleSkipSilence}
-        onClose={() => setSettingsOpen(false)}
-      />
+	async function writeTranscriptToFolder(folderUri) {
+		try {
+			await writeTextFileToFolder(
+				folderUri,
+				transcriptFilename(),
+				entry.transcript,
+			);
+			Alert.alert('Saved', 'Transcript saved to your chosen folder.');
+		} catch (e) {
+			Alert.alert(
+				"Couldn't save",
+				e.message || 'Something went wrong saving the transcript.',
+			);
+		}
+	}
 
-      <EntryTagSheet
-        visible={tagSheetOpen}
-        categories={categories}
-        currentCategory={categories.find((c) => c.id === entry.categoryId) || null}
-        onClose={() => setTagSheetOpen(false)}
-        onApply={applyTagChange}
-        onCategoriesChanged={() => listCategories().then(setCategories)}
-      />
+	async function handleDownloadTranscript() {
+		if (!entry.transcript) return;
+		if (!isExternalFolderSupported()) {
+			// No direct folder-write API on iOS - the share sheet's "Save to Files" covers the same
+			// end result, so that's the closest equivalent to "download" there.
+			await handleShareTranscript();
+			return;
+		}
+		const existingFolder = await getTranscriptFolderUri();
+		if (existingFolder) {
+			await writeTranscriptToFolder(existingFolder);
+			return;
+		}
+		Alert.alert(
+			'Choose a folder',
+			'Pick where transcripts should be saved (e.g. your Downloads folder). You only need to do this once.',
+			[
+				{ text: 'Cancel', style: 'cancel' },
+				{
+					text: 'Choose folder',
+					onPress: async () => {
+						const picked = await pickFolder();
+						if (picked) {
+							await setTranscriptFolderUri(picked);
+							await writeTranscriptToFolder(picked);
+						}
+					},
+				},
+			],
+		);
+	}
 
-      <PromptModal
-        visible={renamePromptVisible}
-        title="Rename entry"
-        initialValue={entry.title}
-        onCancel={() => setRenamePromptVisible(false)}
-        onSubmit={submitRename}
-      />
+	// --- Transcribe button state (drives label + warning message on page 2) ---
+	const transcribed =
+		!transcribing && entry.transcriptStatus === 'done' && !!entry.transcript;
+	const noApiKey = transcribeError === NO_API_KEY;
+	const failed =
+		!transcribing &&
+		!transcribed &&
+		(noApiKey || !!transcribeError || entry.transcriptStatus === 'error');
 
-      <ConfirmModal
-        visible={deleteModalVisible}
-        title="Delete this recording?"
-        message="This cannot be undone."
-        confirmLabel="Delete"
-        destructive
-        onCancel={() => setDeleteModalVisible(false)}
-        onConfirm={confirmDelete}
-      />
-    </View>
-  );
+	let transcribeLabel = 'Transcribe';
+	if (transcribing) transcribeLabel = 'Transcribing…';
+	else if (transcribed) transcribeLabel = 'Transcribed';
+	else if (failed) transcribeLabel = 'Not transcribed';
+
+	let warningMessage = '';
+	if (failed) {
+		if (noApiKey)
+			warningMessage =
+				'Add your free Groq API key in Settings to enable transcription.';
+		else if (transcribeError) warningMessage = transcribeError;
+		else warningMessage = 'Transcription failed. Tap Transcribe to try again.';
+	}
+
+	return (
+		<View style={[styles.container, { backgroundColor: theme.bg }]}>
+			{menuOpen && (
+				<>
+					<Pressable
+						style={StyleSheet.absoluteFill}
+						onPress={() => setMenuOpen(false)}
+					/>
+					<View
+						style={[
+							styles.dropdown,
+							{
+								top: insets.top + 46,
+								backgroundColor: theme.surface,
+								borderColor: theme.border,
+							},
+						]}
+					>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleShare}
+						>
+							<Feather
+								name='share-2'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Share</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleOpenTag}
+						>
+							<Feather
+								name='tag'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Tag</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleRename}
+						>
+							<Feather
+								name='edit-2'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Rename</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleRingtone}
+						>
+							<Feather
+								name='bell'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Set as ringtone</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleTranscribeFromMenu}
+						>
+							<Feather
+								name='file-text'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>
+								{transcribing ? 'Transcribing…' : 'Transcribe'}
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleDetails}
+						>
+							<Feather
+								name='info'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Details</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={handleDelete}
+						>
+							<Feather
+								name='trash-2'
+								size={17}
+								color='#E5605A'
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: '#E5605A' }}>Delete</Text>
+						</TouchableOpacity>
+					</View>
+				</>
+			)}
+
+			{editMenuOpen && (
+				<>
+					<Pressable
+						style={StyleSheet.absoluteFill}
+						onPress={() => setEditMenuOpen(false)}
+					/>
+					<View
+						style={[
+							styles.dropdown,
+							styles.editDropdown,
+							{ backgroundColor: theme.surface, borderColor: theme.border },
+						]}
+					>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={() => {
+								setEditMenuOpen(false);
+								navigation.navigate('Trim', { entryId: entry.id });
+							}}
+						>
+							<Feather
+								name='crop'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Trim audio</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={() => {
+								setEditMenuOpen(false);
+								navigation.navigate('Merge', { entryId: entry.id });
+							}}
+						>
+							<Feather
+								name='git-merge'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Merge audio</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.dropdownItem}
+							onPress={() => {
+								setEditMenuOpen(false);
+								navigation.navigate('Append', { entryId: entry.id });
+							}}
+						>
+							<Feather
+								name='mic'
+								size={17}
+								color={theme.text}
+								style={styles.dropdownIcon}
+							/>
+							<Text style={{ color: theme.text }}>Append recording</Text>
+						</TouchableOpacity>
+					</View>
+				</>
+			)}
+
+			<ScrollView
+				ref={pagerRef}
+				horizontal
+				pagingEnabled
+				showsHorizontalScrollIndicator={false}
+				bounces={false}
+				scrollEventThrottle={16}
+				onScroll={onPagerScroll}
+				onMomentumScrollEnd={onPagerScroll}
+			>
+				{/* --- Page 1: Playback --- */}
+				<View style={{ width }}>
+					<View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+						<TouchableOpacity
+							onPress={() => navigation.goBack()}
+							style={styles.iconBtn}
+						>
+							<Feather
+								name='arrow-left'
+								size={22}
+								color={theme.text}
+							/>
+						</TouchableOpacity>
+						<Text
+							style={[styles.entryTitle, { color: theme.text }]}
+							numberOfLines={1}
+						>
+							{entry.title}
+						</Text>
+						<TouchableOpacity
+							onPress={() => setMenuOpen((v) => !v)}
+							style={styles.iconBtn}
+						>
+							<Feather
+								name='more-vertical'
+								size={20}
+								color={theme.text}
+							/>
+						</TouchableOpacity>
+					</View>
+
+					{/* Four sections: waveform+ruler gets 2/5, the rest split the remaining 3/5 */}
+					<View style={styles.quadrants}>
+						<View style={[styles.quadrant, styles.waveformQuadrant]}>
+							<View style={styles.waveformWrap}>
+								<ScrollingPlaybackTrack
+									waveform={entry.waveform}
+									positionMs={positionMs}
+									totalDurationMs={entry.totalDurationMs}
+									color={entry.categoryColor || theme.accent}
+									mutedColor={theme.waveformMuted}
+									height={190}
+									barWidth={3}
+									onSeek={seekTo}
+								/>
+							</View>
+						</View>
+
+						<View style={[styles.quadrant, styles.centerContent]}>
+							<Text style={[styles.bigTime, { color: theme.text }]}>
+								{formatDuration(positionMs)}
+							</Text>
+						</View>
+
+						<View style={[styles.quadrant, styles.centerContent]}>
+							<Slider
+								style={{ width: '100%', height: 36 }}
+								minimumValue={0}
+								maximumValue={entry.totalDurationMs || 1}
+								value={positionMs}
+								minimumTrackTintColor={theme.accent}
+								maximumTrackTintColor={theme.waveformMuted}
+								thumbTintColor={theme.accent}
+								onSlidingComplete={seekTo}
+							/>
+							<View style={styles.timeRow}>
+								<Text style={{ color: theme.textMuted, fontSize: 12 }}>
+									{formatDuration(positionMs)}
+								</Text>
+								<Text style={{ color: theme.textMuted, fontSize: 12 }}>
+									{formatDuration(entry.totalDurationMs)}
+								</Text>
+							</View>
+						</View>
+
+						<View style={[styles.quadrant, styles.centerContent]}>
+							<View style={styles.transportRow}>
+								<TouchableOpacity
+									onPress={() => setSettingsOpen(true)}
+									style={styles.iconBtn}
+								>
+									<Feather
+										name='sliders'
+										size={22}
+										color={theme.text}
+									/>
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={() => skip(-5000)}
+									style={styles.iconBtn}
+								>
+									<MaterialIcons
+										name='replay-5'
+										size={28}
+										color={theme.text}
+									/>
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={togglePlay}
+									style={[
+										styles.playPauseBtn,
+										{ backgroundColor: theme.accent },
+									]}
+								>
+									<Feather
+										name={isPlaying ? 'pause' : 'play'}
+										size={26}
+										color='#fff'
+										style={isPlaying ? undefined : { marginLeft: 3 }}
+									/>
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={() => skip(5000)}
+									style={styles.iconBtn}
+								>
+									<MaterialIcons
+										name='forward-5'
+										size={28}
+										color={theme.text}
+									/>
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={() => setEditMenuOpen((v) => !v)}
+									style={styles.iconBtn}
+								>
+									<Feather
+										name='scissors'
+										size={20}
+										color={theme.text}
+									/>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
+				</View>
+
+				{/* --- Page 2: Transcribe --- */}
+				<View style={{ width }}>
+					<View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+						<TouchableOpacity
+							onPress={goToPlaybackPage}
+							style={styles.iconBtn}
+						>
+							<Feather
+								name='arrow-left'
+								size={22}
+								color={theme.text}
+							/>
+						</TouchableOpacity>
+						<Text
+							style={[styles.entryTitle, { color: theme.text }]}
+							numberOfLines={1}
+						>
+							{entry.title}
+						</Text>
+						<View style={styles.iconBtn} />
+					</View>
+
+					<ScrollView
+						style={styles.transcribePageScroll}
+						contentContainerStyle={styles.transcribePageContent}
+					>
+						<TouchableOpacity
+							onPress={startTranscribe}
+							disabled={transcribing}
+							style={[
+								styles.transcribeBtn,
+								{
+									backgroundColor: failed ? theme.surfaceAlt : theme.accent,
+									opacity: transcribing ? 0.7 : 1,
+								},
+							]}
+						>
+							<Feather
+								name={
+									transcribed
+										? 'check-circle'
+										: failed
+											? 'alert-circle'
+											: 'file-text'
+								}
+								size={18}
+								color={failed ? theme.text : '#fff'}
+								style={{ marginRight: 8 }}
+							/>
+							<Text
+								style={{
+									color: failed ? theme.text : '#fff',
+									fontWeight: '700',
+									fontSize: 15,
+								}}
+							>
+								{transcribeLabel}
+							</Text>
+						</TouchableOpacity>
+
+						{!!warningMessage && (
+							<View
+								style={[
+									styles.warningBox,
+									{ backgroundColor: theme.surface, borderColor: theme.border },
+								]}
+							>
+								<Text
+									style={{
+										color: theme.textMuted,
+										fontSize: 13,
+										lineHeight: 19,
+									}}
+								>
+									{noApiKey ? 'Add your free Groq API key in ' : warningMessage}
+									{noApiKey && (
+										<Text
+											style={{ color: theme.accent, fontWeight: '700' }}
+											onPress={() => navigation.navigate('Settings')}
+										>
+											Settings
+										</Text>
+									)}
+									{noApiKey && ' to enable transcription.'}
+								</Text>
+							</View>
+						)}
+
+						{!!entry.transcript && (
+							<View
+								style={[
+									styles.transcriptBox,
+									{ backgroundColor: theme.surface, borderColor: theme.border },
+								]}
+							>
+								<Text
+									style={{
+										color: theme.textMuted,
+										fontSize: 12,
+										marginBottom: 8,
+									}}
+								>
+									Language: {languageDisplayName(entry.transcriptLanguage)}
+								</Text>
+								<Text
+									style={{ color: theme.text, fontSize: 15, lineHeight: 23 }}
+								>
+									{entry.transcript}
+								</Text>
+								<View style={styles.transcriptActionsRow}>
+									<TouchableOpacity
+										onPress={handleCopyTranscript}
+										style={styles.transcriptActionBtn}
+									>
+										<Feather
+											name='copy'
+											size={18}
+											color={theme.textMuted}
+										/>
+									</TouchableOpacity>
+									<TouchableOpacity
+										onPress={handleShareTranscript}
+										style={styles.transcriptActionBtn}
+									>
+										<Feather
+											name='share-2'
+											size={18}
+											color={theme.textMuted}
+										/>
+									</TouchableOpacity>
+									<TouchableOpacity
+										onPress={handleDownloadTranscript}
+										style={styles.transcriptActionBtn}
+									>
+										<Feather
+											name='download'
+											size={18}
+											color={theme.textMuted}
+										/>
+									</TouchableOpacity>
+								</View>
+							</View>
+						)}
+					</ScrollView>
+				</View>
+			</ScrollView>
+
+			<PlaybackSettingsSheet
+				visible={settingsOpen}
+				speed={speed}
+				skipSilence={skipSilence}
+				onChangeSpeed={changeSpeed}
+				onToggleSkipSilence={toggleSkipSilence}
+				onClose={() => setSettingsOpen(false)}
+			/>
+
+			<EntryTagSheet
+				visible={tagSheetOpen}
+				categories={categories}
+				currentCategory={
+					categories.find((c) => c.id === entry.categoryId) || null
+				}
+				onClose={() => setTagSheetOpen(false)}
+				onApply={applyTagChange}
+				onCategoriesChanged={() => listCategories().then(setCategories)}
+			/>
+
+			<PromptModal
+				visible={renamePromptVisible}
+				title='Rename entry'
+				initialValue={entry.title}
+				onCancel={() => setRenamePromptVisible(false)}
+				onSubmit={submitRename}
+			/>
+
+			<ConfirmModal
+				visible={deleteModalVisible}
+				title='Delete this recording?'
+				message='This cannot be undone.'
+				confirmLabel='Delete'
+				destructive
+				onCancel={() => setDeleteModalVisible(false)}
+				onConfirm={confirmDelete}
+			/>
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  entryTitle: { fontSize: 16, fontWeight: '700', flex: 1, marginHorizontal: 8, textAlign: 'center' },
-  iconBtn: { padding: 8 },
-  dropdown: {
-    position: 'absolute',
-    right: 16,
-    borderWidth: 1,
-    borderRadius: 12,
-    zIndex: 10,
-    overflow: 'hidden',
-  },
-  editDropdown: {
-    bottom: 110,
-    right: 24,
-    left: undefined,
-    top: undefined,
-  },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  dropdownIcon: { marginRight: 10 },
-  quadrants: { flex: 1, paddingHorizontal: 16 },
-  quadrant: { flex: 1, justifyContent: 'center' },
-  waveformQuadrant: { flex: 2 },
-  centerContent: { alignItems: 'center' },
-  waveformWrap: { width: '100%' },
-  bigTime: { fontSize: 44, fontWeight: '200', fontVariant: ['tabular-nums'] },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: -4 },
-  transportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-  },
-  playPauseBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  transcriptScroll: { maxHeight: 160, marginHorizontal: 20, marginBottom: 16 },
-  transcriptBox: { padding: 14, borderRadius: 12, borderWidth: 1 },
+	container: { flex: 1 },
+	topBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 8,
+		paddingBottom: 8,
+	},
+	entryTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		flex: 1,
+		marginHorizontal: 8,
+		textAlign: 'center',
+	},
+	iconBtn: { padding: 8 },
+	dropdown: {
+		position: 'absolute',
+		right: 16,
+		borderWidth: 1,
+		borderRadius: 12,
+		zIndex: 10,
+		overflow: 'hidden',
+	},
+	editDropdown: {
+		bottom: 110,
+		right: 24,
+		left: undefined,
+		top: undefined,
+	},
+	dropdownItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+	},
+	dropdownIcon: { marginRight: 10 },
+	quadrants: { flex: 1, paddingHorizontal: 16 },
+	quadrant: { flex: 1, justifyContent: 'center' },
+	waveformQuadrant: { flex: 2 },
+	centerContent: { alignItems: 'center' },
+	waveformWrap: { width: '100%' },
+	bigTime: { fontSize: 44, fontWeight: '200', fontVariant: ['tabular-nums'] },
+	timeRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		width: '100%',
+		marginTop: -4,
+	},
+	transportRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 18,
+	},
+	playPauseBtn: {
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	transcribePageScroll: { flex: 1 },
+	transcribePageContent: {
+		paddingHorizontal: 20,
+		paddingTop: 8,
+		paddingBottom: 32,
+	},
+	transcribeBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 14,
+		borderRadius: 14,
+		marginBottom: 14,
+	},
+	warningBox: {
+		padding: 14,
+		borderRadius: 12,
+		borderWidth: 1,
+		marginBottom: 14,
+	},
+	transcriptBox: { padding: 14, borderRadius: 12, borderWidth: 1 },
+	transcriptActionsRow: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+		marginTop: 12,
+		gap: 4,
+	},
+	transcriptActionBtn: { padding: 8 },
 });

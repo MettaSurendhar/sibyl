@@ -7,7 +7,9 @@
     "userInterfaceStyle": "dark",
     "scheme": "sibyl",
     "icon": "./assets/icon.png",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mettasurendhar.sibyl",
@@ -17,7 +19,12 @@
     },
     "android": {
       "package": "com.mettasurendhar.sibyl",
-      "permissions": ["RECORD_AUDIO", "WRITE_EXTERNAL_STORAGE"],
+      "permissions": [
+        "RECORD_AUDIO",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E1926"
@@ -48,6 +55,11 @@
         }
       ],
       "./plugins/withFfmpegKitFix.js"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "aedfb425-d80b-4aec-b196-ec3250cc7e7c"
+      }
+    }
   }
 }
