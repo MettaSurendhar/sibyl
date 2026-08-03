@@ -85,11 +85,7 @@ export default function NamingTagsSettingsScreen({ navigation }) {
 				title='Untagged recording naming'
 				right={
 					<InfoPopover title='Untagged recording naming'>
-						Controls the suggested name shown when you save a recording without
-						picking a tag. Add Count to number recordings in order, or Date to
-						include today's date - tap "Or type directly" to write a template
-						yourself using {'{tag}'}, {'<count>'}, {'<date>'},{' '}
-						{'<date:PATTERN>'} or {'<time:PATTERN>'}.
+						{`• Controls the suggested name when saving without a tag\n• Add Count to number recordings in order\n• Add Date/Time to include the current timestamp\n• Tap "Or type directly" to write a custom template`}
 					</InfoPopover>
 				}
 			>
@@ -107,10 +103,7 @@ export default function NamingTagsSettingsScreen({ navigation }) {
 				title='Derived recording naming'
 				right={
 					<InfoPopover title='Derived recording naming'>
-						Trim, Merge, and Append each create a new recording rather than
-						changing the original - these control the suggested name shown when
-						saving one. Use Name for the source recording's name, plus Date and
-						Time to timestamp it.
+						{`• Trim, Merge, and Append create new recordings rather than changing the original\n• These templates control the suggested name for each action\n• Use Name for the source recording's name\n• Use Date and Time to timestamp it`}
 					</InfoPopover>
 				}
 			>

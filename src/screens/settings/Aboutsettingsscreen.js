@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
+import InfoPopover from '../../components/InfoPopover';
 
 export default function AboutSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
@@ -19,16 +20,19 @@ export default function AboutSettingsScreen({ navigation }) {
 				onBack={() => navigation.goBack()}
 			/>
 
-			<SettingsSection title='About'>
+			<SettingsSection
+				title='About'
+				right={
+					<InfoPopover title='Local-first architecture'>
+						{`• All recordings and metadata stay strictly on your device\n• We do not sync, store, or have access to your data\n• Deleting the app deletes your data permanently (unless you use the external saving folder option)`}
+					</InfoPopover>
+				}
+			>
 				<Text style={{ color: theme.textMuted }}>Sibyl — v1.0.0</Text>
 				<Text
 					style={{ color: theme.textMuted, fontStyle: 'italic', marginTop: 2 }}
 				>
 					speak, and be remembered
-				</Text>
-				<Text style={{ color: theme.textMuted, marginTop: 4 }}>
-					A local-first voice diary. All recordings and metadata stay on your
-					device.
 				</Text>
 			</SettingsSection>
 		</ScrollView>

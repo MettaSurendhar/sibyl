@@ -5,9 +5,11 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
+	Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';
 
 // Recognizes every token shape the naming templates already support (see utils/naming.js):
 // {tag}, {name}, <count>, <date>, <date:PATTERN>, <time:PATTERN>. Matching + splitting use the
@@ -51,8 +53,23 @@ export default function TemplateChipEditor({
 		start: (value || '').length,
 		end: (value || '').length,
 	});
+	const [pickerType, setPickerType] = useState(null);
 
 	const segments = parseSegments(value);
+
+	function getBaseToken(str) {
+		if (str.startsWith('<date')) return '<date>';
+		if (str.startsWith('<time')) return '<time>';
+		return str;
+	}
+
+	const usedBaseTokens = new Set(
+		segments.filter((s) => s.isToken).map((s) => getBaseToken(s.text))
+	);
+
+	const visibleTokens = availableTokens.filter(
+		(t) => !usedBaseTokens.has(getBaseToken(t.token))
+	);
 
 	function insertToken(token) {
 		const text = value || '';
@@ -67,6 +84,17 @@ export default function TemplateChipEditor({
 		onChange(next);
 		const cursor = (before + insertion).length;
 		setSelection({ start: cursor, end: cursor });
+		setPickerType(null);
+	}
+
+	function handleTokenPress(token) {
+		if (token.startsWith('<date')) {
+			setPickerType('date');
+		} else if (token.startsWith('<time')) {
+			setPickerType('time');
+		} else {
+			insertToken(token);
+		}
 	}
 
 	function removeSegmentAt(index) {
@@ -130,10 +158,10 @@ export default function TemplateChipEditor({
 			</View>
 
 			<View style={styles.tokenRow}>
-				{availableTokens.map((t) => (
+				{visibleTokens.map((t) => (
 					<TouchableOpacity
 						key={t.token}
-						onPress={() => insertToken(t.token)}
+						onPress={() => handleTokenPress(t.token)}
 						style={[styles.tokenBtn, { borderColor: theme.border }]}
 					>
 						<Feather
@@ -166,6 +194,41 @@ export default function TemplateChipEditor({
 				placeholder='Or type directly…'
 				placeholderTextColor={theme.textMuted}
 			/>
+
+			<Modal
+				visible={!!pickerType}
+				transparent
+				animationType='fade'
+				onRequestClose={() => setPickerType(null)}
+			>
+				<TouchableOpacity
+					style={styles.backdrop}
+					activeOpacity={1}
+					onPress={() => setPickerType(null)}
+				>
+					<View style={[styles.pickerCard, { backgroundColor: theme.surface }]}>
+						<Text style={[styles.pickerTitle, { color: theme.text }]}>
+							{pickerType === 'date' ? 'Date Format' : 'Time Format'}
+						</Text>
+						<View style={styles.presetWrap}>
+							{(pickerType === 'date'
+								? DATE_FORMAT_PRESETS
+								: TIME_FORMAT_PRESETS
+							).map((p) => (
+								<TouchableOpacity
+									key={p.key}
+									onPress={() => insertToken(`<${pickerType}:${p.pattern}>`)}
+									style={[styles.presetChip, { borderColor: theme.border }]}
+								>
+									<Text style={{ color: theme.text, fontSize: 13 }}>
+										{p.key}
+									</Text>
+								</TouchableOpacity>
+							))}
+						</View>
+					</View>
+				</TouchableOpacity>
+			</Modal>
 		</View>
 	);
 }
@@ -203,4 +266,33 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 10,
 	},
 	rawInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14 },
+	backdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 24,
+	},
+	pickerCard: {
+		width: '100%',
+		maxWidth: 340,
+		borderRadius: 16,
+		padding: 20,
+	},
+	pickerTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		marginBottom: 16,
+	},
+	presetWrap: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	presetChip: {
+		borderWidth: 1,
+		borderRadius: 8,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+	},
 });

@@ -13,6 +13,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
 import { getGroqApiKey, setGroqApiKey } from '../../utils/settingsStore';
+import InfoPopover from '../../components/InfoPopover';
 
 export default function TranscriptionSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
@@ -38,14 +39,14 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 				onBack={() => navigation.goBack()}
 			/>
 
-			<SettingsSection title='Groq'>
-				<Text
-					style={{ color: theme.textMuted, marginBottom: 14, fontSize: 13 }}
-				>
-					Needs an internet connection and a free API key from console.groq.com.
-					Recording and playback stay fully offline — only transcription calls
-					out.
-				</Text>
+			<SettingsSection
+				title='Groq'
+				right={
+					<InfoPopover title='Groq API'>
+						{`• Needs an internet connection\n• Requires a free API key from console.groq.com\n• Recording and playback stay fully offline\n• Only transcription connects to the internet`}
+					</InfoPopover>
+				}
+			>
 
 				<View
 					style={[

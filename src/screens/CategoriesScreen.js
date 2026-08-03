@@ -13,8 +13,7 @@ import {
 } from '../db/categories';
 import { renderTemplate, DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';
 import ConfirmModal from '../components/ConfirmModal';
-
-const PALETTE = ['#6C8EF5', '#F5A65C', '#E56C6C', '#5CC9A7', '#B87CE0', '#E0C15C'];
+import { TAG_COLOR_PALETTE, TAG_EMOJI_PRESETS, iconForCategory } from '../utils/tagColors';
 
 export default function CategoriesScreen({ navigation }) {
   const { theme } = useTheme();
@@ -25,6 +24,8 @@ export default function CategoriesScreen({ navigation }) {
   const [editTarget, setEditTarget] = useState(null);
   const [editName, setEditName] = useState('');
   const [editTemplate, setEditTemplate] = useState('');
+  const [editColor, setEditColor] = useState(null);
+  const [editIcon, setEditIcon] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -43,8 +44,9 @@ export default function CategoriesScreen({ navigation }) {
   async function handleAdd() {
     const name = newName.trim();
     if (!name) return;
-    const color = PALETTE[categories.length % PALETTE.length];
-    await createCategory({ name, prefix: name, color });
+    const color = TAG_COLOR_PALETTE[categories.length % TAG_COLOR_PALETTE.length];
+    const icon = TAG_EMOJI_PRESETS[categories.length % TAG_EMOJI_PRESETS.length];
+    await createCategory({ name, prefix: name, color, icon });
     setNewName('');
     refresh();
   }
@@ -53,6 +55,8 @@ export default function CategoriesScreen({ navigation }) {
     setEditTarget(cat);
     setEditName(cat.name);
     setEditTemplate(cat.nameTemplate || '{tag} <count>');
+    setEditColor(cat.color);
+    setEditIcon(cat.icon);
   }
 
   async function saveEdit() {
@@ -60,7 +64,8 @@ export default function CategoriesScreen({ navigation }) {
     await updateCategory(editTarget.id, {
       name: editName,
       prefix: editName,
-      color: editTarget.color,
+      color: editColor,
+      icon: editIcon,
       nameTemplate: editTemplate,
     });
     setEditTarget(null);
@@ -126,6 +131,7 @@ export default function CategoriesScreen({ navigation }) {
         renderItem={({ item }) => (
           <View style={[styles.catRow, { borderColor: theme.border }]}>
             <View style={[styles.swatch, { backgroundColor: item.color }]} />
+            <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(item)}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>{item.name}</Text>
               <Text style={{ color: theme.textMuted, fontSize: 12 }}>
@@ -155,7 +161,37 @@ export default function CategoriesScreen({ navigation }) {
                 style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt, marginBottom: 14 }]}
               />
 
-              <Text style={[styles.label, { color: theme.textMuted }]}>Naming format</Text>
+              <Text style={[styles.label, { color: theme.textMuted }]}>Color</Text>
+              <View style={styles.colorRow}>
+                {TAG_COLOR_PALETTE.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() => setEditColor(color)}
+                    style={[
+                      styles.colorSwatch,
+                      { backgroundColor: color, borderWidth: editColor === color ? 3 : 0, borderColor: theme.text }
+                    ]}
+                  />
+                ))}
+              </View>
+
+              <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Icon</Text>
+              <View style={styles.emojiRow}>
+                {TAG_EMOJI_PRESETS.map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    onPress={() => setEditIcon(emoji)}
+                    style={[
+                      styles.emojiBtn,
+                      { backgroundColor: editIcon === emoji ? theme.surfaceAlt : 'transparent' }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Naming format</Text>
               <TextInput
                 value={editTemplate}
                 onChangeText={setEditTemplate}
@@ -244,4 +280,8 @@ const styles = StyleSheet.create({
   presetChip: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
   row: { flexDirection: 'row', gap: 12, marginTop: 20 },
   btn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+  colorSwatch: { width: 30, height: 30, borderRadius: 15 },
+  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  emojiBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

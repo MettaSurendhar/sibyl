@@ -14,6 +14,7 @@ import { useAlert } from '../../theme/AlertContext';
 import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
 import ConfirmModal from '../../components/ConfirmModal';
+import InfoPopover from '../../components/InfoPopover';
 import {
 	getPrefs,
 	setPrefs,
@@ -168,14 +169,14 @@ export default function RecordingSettingsScreen({ navigation }) {
 				))}
 			</SettingsSection>
 
-			<SettingsSection title='Recordings saving folder'>
-				<Text style={{ color: theme.textMuted, marginBottom: 8, fontSize: 13 }}>
-					Optional. When set, a copy of every new recording is also saved into
-					this folder on your phone, so you can browse it outside the app.
-					Recordings still play and edit from the app's own storage either way -
-					this is an extra, visible copy, not a replacement for it.
-					{Platform.OS !== 'android' && ' Android only, for now.'}
-				</Text>
+			<SettingsSection
+				title='Recordings saving folder'
+				right={
+					<InfoPopover title='Recordings saving folder'>
+						{`• Optional: saves a copy of every new recording to this folder\n• Lets you browse files outside the app\n• Recordings still play and edit from the app's internal storage\n• Android only (for now)`}
+					</InfoPopover>
+				}
+			>
 				<TouchableOpacity
 					style={[
 						styles.navButton,
@@ -249,14 +250,14 @@ export default function RecordingSettingsScreen({ navigation }) {
 				)}
 			</SettingsSection>
 
-			<SettingsSection title='Transcript downloads folder'>
-				<Text style={{ color: theme.textMuted, marginBottom: 8, fontSize: 13 }}>
-					Optional. Where the download button on a transcript saves its .txt
-					file. You're asked to pick one the first time you download a
-					transcript if you haven't set one here - this lets you set or change
-					it anytime.
-					{Platform.OS !== 'android' && ' Android only, for now.'}
-				</Text>
+			<SettingsSection
+				title='Transcript downloads folder'
+				right={
+					<InfoPopover title='Transcript downloads folder'>
+						{`• Optional: sets where downloaded transcripts are saved\n• You are asked to pick a folder on your first download\n• You can change it here anytime\n• Android only (for now)`}
+					</InfoPopover>
+				}
+			>
 				<TouchableOpacity
 					style={[
 						styles.navButton,
