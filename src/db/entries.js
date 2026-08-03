@@ -119,20 +119,23 @@ export async function getEntry(id) {
 	return { ...e, waveform: JSON.parse(e.waveform || '[]'), segments };
 }
 
-// Creates a brand-new entry with its first audio segment
+// Creates a brand-new entry with its first audio segment. sourceType distinguishes a fresh
+// recording ('recorded', the default) from a derivative produced by Trim/Merge/Append -
+// see the migration comment in database.js for why this exists.
 export async function createEntry({
 	title,
 	categoryId,
 	uri,
 	durationMs,
 	waveform,
+	sourceType = 'recorded',
 }) {
 	const db = await getDb();
 	const id = newId('entry');
 	const now = Date.now();
 	await db.runAsync(
-		`INSERT INTO entries (id, title, categoryId, createdAt, updatedAt, totalDurationMs, waveform, transcript, transcriptStatus)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'none')`,
+		`INSERT INTO entries (id, title, categoryId, createdAt, updatedAt, totalDurationMs, waveform, transcript, transcriptStatus, sourceType)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'none', ?)`,
 		[
 			id,
 			title,
@@ -141,6 +144,7 @@ export async function createEntry({
 			now,
 			durationMs,
 			JSON.stringify(sanitizeWaveform(waveform)),
+			sourceType,
 		],
 	);
 	const segId = newId('seg');

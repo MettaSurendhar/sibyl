@@ -168,6 +168,7 @@ export default function AppendScreen({ route, navigation }) {
 				uri: merged.uri,
 				durationMs: merged.combinedDurationMs,
 				waveform: merged.combinedWaveform,
+				sourceType: 'appended',
 			});
 
 			// Only the fresh temp recording is cleanup-eligible - the original entry's files must

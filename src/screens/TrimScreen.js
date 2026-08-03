@@ -245,6 +245,7 @@ export default function TrimScreen({ route, navigation }) {
 				uri: trimmed.uri,
 				durationMs: endMs - startMs,
 				waveform: newWaveform,
+				sourceType: 'trimmed',
 			});
 
 			// Only the intermediate concat file (if any) is temporary - the original entry's own

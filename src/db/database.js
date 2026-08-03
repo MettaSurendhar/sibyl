@@ -88,6 +88,21 @@ export async function getDb() {
 		// column already exists
 	}
 
+	// migration: sourceType column on entries ('recorded' | 'trimmed' | 'merged' | 'appended')
+	// - lets the Home pie chart split Trim/Merge/Append output into their own slices instead
+	// of mixing them into ordinary tag slices, since each one is a derivative of an existing
+	// recording rather than a fresh session. Ignore if it already exists.
+	try {
+		await dbInstance.execAsync(
+			'ALTER TABLE entries ADD COLUMN sourceType TEXT',
+		);
+	} catch (e) {
+		// column already exists
+	}
+	await dbInstance.runAsync(
+		"UPDATE entries SET sourceType = 'recorded' WHERE sourceType IS NULL",
+	);
+
 	// indexes for the Home screen's per-tag streaks, line chart, and heatmap - these all
 	// aggregate by createdAt/categoryId and should stay fast as entries grow into the
 	// hundreds/thousands rather than degrading into full table scans.

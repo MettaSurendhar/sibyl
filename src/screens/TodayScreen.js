@@ -1,32 +1,44 @@
 import React, { useCallback, useState } from 'react';
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	FlatList,
-	StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { getStreakCount, getRecentEntries } from '../db/entries';
-import { formatDuration, dateGroupLabel, timeLabel } from '../utils/format';
-import { greetingForNow } from '../components/HomeHeader';
+import { getAllTagCounts, getPieBreakdown } from '../db/categories';
+import { getStreakCount, getDailyEntryCounts } from '../db/entries';
+import TagCountBoxes from '../components/home/TagCountBoxes';
+import GraphCarousel from '../components/home/GraphCarousel';
 
-// NOTE: this screen's content (greeting/streak/recent-list) is unchanged from before -
-// only its own floating record button was removed, since HomeLibraryPager now renders one
-// persistent FloatingRecordButton above both Home and Library. Full content redesign
-// (tag boxes + charts) is Phase 2, not this pass.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const LINE_CHART_DAYS = 14;
+const HEATMAP_WEEKS = 20; // ~4-5 months; kept screen-width-sized, see ActivityHeatmap comment
+
+// Home dashboard: tag count boxes up top, three swipeable graphs below (streak line, pie,
+// activity heatmap). Replaces the old "Still up? / streak pill / recent entries" layout per
+// the phase plan - the overall streak still gets a small mention, just folded into the
+// header instead of being the whole screen's identity.
 export default function TodayScreen({ navigation }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
-	const [streak, setStreak] = useState(0);
-	const [recent, setRecent] = useState([]);
+	const [tagCounts, setTagCounts] = useState([]);
+	const [overallStreak, setOverallStreak] = useState(0);
+	const [dailyRows, setDailyRows] = useState([]);
+	const [pieSlices, setPieSlices] = useState([]);
 
 	const refresh = useCallback(() => {
-		getStreakCount().then(setStreak);
-		getRecentEntries(5).then(setRecent);
+		const now = Date.now();
+		const heatmapFrom = now - HEATMAP_WEEKS * 7 * DAY_MS;
+		Promise.all([
+			getAllTagCounts(),
+			getStreakCount(),
+			getDailyEntryCounts({ from: heatmapFrom, to: now }),
+			getPieBreakdown(),
+		]).then(([tags, streak, daily, pie]) => {
+			setTagCounts(tags);
+			setOverallStreak(streak);
+			setDailyRows(daily);
+			setPieSlices(pie);
+		});
 	}, []);
 
 	useFocusEffect(
@@ -36,17 +48,17 @@ export default function TodayScreen({ navigation }) {
 	);
 
 	return (
-		<View
-			style={[
-				styles.container,
-				{ backgroundColor: theme.bg, paddingTop: insets.top + 20 },
-			]}
+		<ScrollView
+			style={[styles.container, { backgroundColor: theme.bg }]}
+			contentContainerStyle={{
+				paddingTop: insets.top + 20,
+				paddingBottom: insets.bottom + 140,
+			}}
+			showsVerticalScrollIndicator={false}
 		>
 			<View style={styles.headerRow}>
-				<Text style={[styles.greeting, { color: theme.text }]}>
-					{greetingForNow()}
-				</Text>
-				{streak > 0 && (
+				<Text style={[styles.title, { color: theme.text }]}>Home</Text>
+				{overallStreak > 0 && (
 					<View
 						style={[styles.streakPill, { backgroundColor: theme.surfaceAlt }]}
 					>
@@ -57,79 +69,35 @@ export default function TodayScreen({ navigation }) {
 							style={{ marginRight: 4 }}
 						/>
 						<Text style={[styles.streakText, { color: theme.text }]}>
-							{streak}-day streak
+							{overallStreak}-day overall streak
 						</Text>
 					</View>
 				)}
 			</View>
 
-			<Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
-				RECENT ENTRIES
-			</Text>
+			<TagCountBoxes tags={tagCounts} />
 
-			<FlatList
-				data={recent}
-				keyExtractor={(item) => item.id}
-				contentContainerStyle={{
-					paddingBottom: insets.bottom + 100,
-					flexGrow: 1,
-				}}
-				ListEmptyComponent={
-					<View style={styles.emptyWrap}>
-						<Feather
-							name='mic'
-							size={26}
-							color={theme.textMuted}
-						/>
-						<Text style={[styles.emptyTitle, { color: theme.text }]}>
-							Nothing here yet
-						</Text>
-						<Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
-							Tap the record button below to make your first entry.
-						</Text>
-					</View>
-				}
-				renderItem={({ item }) => (
-					<TouchableOpacity
-						style={[
-							styles.entryRow,
-							{ backgroundColor: theme.surface, borderColor: theme.border },
-						]}
-						onPress={() =>
-							navigation.navigate('Playback', { entryId: item.id })
-						}
-					>
-						<View style={{ flex: 1 }}>
-							<Text
-								style={[styles.entryTitle, { color: theme.text }]}
-								numberOfLines={1}
-							>
-								{item.title}
-							</Text>
-							<Text style={[styles.entrySubtitle, { color: theme.textMuted }]}>
-								{item.categoryName || 'Untagged'} ·{' '}
-								{dateGroupLabel(item.updatedAt)}, {timeLabel(item.updatedAt)}
-							</Text>
-						</View>
-						<Text style={[styles.entryDuration, { color: theme.textMuted }]}>
-							{formatDuration(item.totalDurationMs)}
-						</Text>
-					</TouchableOpacity>
-				)}
+			<GraphCarousel
+				tags={tagCounts}
+				dailyRows={dailyRows}
+				pieSlices={pieSlices}
+				lineChartDays={LINE_CHART_DAYS}
+				heatmapWeeks={HEATMAP_WEEKS}
 			/>
-		</View>
+		</ScrollView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, paddingHorizontal: 20 },
+	container: { flex: 1 },
 	headerRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		paddingHorizontal: 20,
 		marginBottom: 18,
 	},
-	greeting: { fontSize: 24, fontWeight: '700' },
+	title: { fontSize: 24, fontWeight: '700' },
 	streakPill: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -138,29 +106,4 @@ const styles = StyleSheet.create({
 		borderRadius: 14,
 	},
 	streakText: { fontSize: 12, fontWeight: '700' },
-	sectionLabel: {
-		fontSize: 12,
-		fontWeight: '700',
-		letterSpacing: 0.5,
-		marginBottom: 10,
-	},
-	entryRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderRadius: 14,
-		padding: 14,
-		marginBottom: 10,
-	},
-	entryTitle: { fontSize: 15, fontWeight: '600' },
-	entrySubtitle: { fontSize: 12.5, marginTop: 2 },
-	entryDuration: { fontSize: 13, marginLeft: 10 },
-	emptyWrap: { alignItems: 'center', paddingTop: 60 },
-	emptyTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		marginTop: 14,
-		marginBottom: 4,
-	},
-	emptySubtitle: { fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },
 });

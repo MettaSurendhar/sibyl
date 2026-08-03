@@ -25,13 +25,13 @@ const MARGIN = 16;
 // releasing snaps it fully on-screen and remembers the new spot for next launch. Tap and
 // long-press-drag are composed as a Race so a normal tap can never accidentally trigger a
 // drag, and a drag can never accidentally fire onPress.
-export default function FloatingRecordButton({ onPress }) {
+export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
 	const { width: screenW, height: screenH } = Dimensions.get('window');
 
 	const defaultX = screenW - BUTTON_SIZE - MARGIN;
-	const defaultY = screenH - BUTTON_SIZE - MARGIN - insets.bottom - 24;
+	const defaultY = screenH - BUTTON_SIZE - MARGIN - bottomOffset;
 
 	const translateX = useSharedValue(defaultX);
 	const translateY = useSharedValue(defaultY);
@@ -62,7 +62,7 @@ export default function FloatingRecordButton({ onPress }) {
 	const clampY = (y) =>
 		Math.max(
 			insets.top + MARGIN,
-			Math.min(screenH - BUTTON_SIZE - MARGIN - insets.bottom, y),
+			Math.min(screenH - BUTTON_SIZE - MARGIN - bottomOffset, y),
 		);
 
 	const longPress = Gesture.LongPress()

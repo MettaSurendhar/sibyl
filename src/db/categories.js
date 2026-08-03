@@ -115,6 +115,57 @@ export async function getAllTagCounts() {
 	];
 }
 
+// Pie chart data source: for entries created directly via Record ('recorded', the default
+// sourceType), break down by tag exactly like getAllTagCounts. Entries produced by
+// Trim/Merge/Append are grouped as their own slices instead of by tag - they're a
+// derivative of an existing recording rather than a fresh session, so mixing them into the
+// tag slices would double-count the same underlying audio. This is the one open design
+// call flagged in the phase plan: same chart, separate slices, rather than a second chart.
+export async function getPieBreakdown() {
+	const db = await getDb();
+	const tagRows = await db.getAllAsync(`
+    SELECT c.id as id, c.name as name, c.icon as icon, c.color as color, COUNT(e.id) as count
+    FROM categories c
+    LEFT JOIN entries e ON e.categoryId = c.id AND (e.sourceType IS NULL OR e.sourceType = 'recorded')
+    GROUP BY c.id
+  `);
+	const untaggedRow = await db.getFirstAsync(
+		"SELECT COUNT(*) as c FROM entries WHERE categoryId IS NULL AND (sourceType IS NULL OR sourceType = 'recorded')",
+	);
+	const opRows = await db.getAllAsync(`
+    SELECT sourceType, COUNT(*) as count FROM entries
+    WHERE sourceType IN ('trimmed', 'merged', 'appended')
+    GROUP BY sourceType
+  `);
+	const opMeta = {
+		trimmed: { name: 'Trimmed', color: '#E0C15C', icon: '✂️' },
+		merged: { name: 'Merged', color: '#6CC5E5', icon: '🔗' },
+		appended: { name: 'Appended', color: '#B87CE0', icon: '➕' },
+	};
+	const slices = [
+		...tagRows.map((r) => ({
+			key: r.id,
+			name: r.name,
+			color: r.color,
+			icon: r.icon,
+			count: r.count,
+		})),
+		{
+			key: 'untagged',
+			name: 'Untagged',
+			color: UNTAGGED_COLOR,
+			icon: UNTAGGED_ICON,
+			count: untaggedRow?.c || 0,
+		},
+		...opRows.map((r) => ({
+			key: r.sourceType,
+			...opMeta[r.sourceType],
+			count: r.count,
+		})),
+	];
+	return slices.filter((s) => s.count > 0);
+}
+
 // Preview-only: what the name WOULD be if this category is chosen, without saving anything.
 export async function previewNameForCategory(category) {
 	if (!category) return null;

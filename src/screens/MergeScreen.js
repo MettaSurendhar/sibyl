@@ -93,6 +93,7 @@ export default function MergeScreen({ route, navigation }) {
 				uri: merged.uri,
 				durationMs: combinedDurationMs,
 				waveform: orderedWaveform,
+				sourceType: 'merged',
 			});
 
 			navigation.replace('Playback', { entryId: newId });
