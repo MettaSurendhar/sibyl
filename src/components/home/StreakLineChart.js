@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Line, Polyline } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
-const CHART_HEIGHT = 160;
+const CHART_HEIGHT = 180;
 const PADDING = 20;
 
 function dateKeyLocal(d) {

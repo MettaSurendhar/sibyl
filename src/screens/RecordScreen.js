@@ -179,7 +179,7 @@ export default function RecordScreen({ navigation }) {
 		setSamples([]);
 		setElapsedMs(0);
 		pendingResultRef.current = null;
-		navigation.navigate('Library');
+		navigation.navigate('Main', { initialPage: 1 });
 	}
 
 	async function discardPendingRecording() {

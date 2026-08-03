@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
-const SIZE = 150;
+const SIZE = 170;
 const RADIUS = SIZE / 2;
 
 // Angle convention: 0deg = 12 o'clock, increasing clockwise - the usual convention for pie

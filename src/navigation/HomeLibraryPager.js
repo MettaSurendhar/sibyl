@@ -7,6 +7,7 @@ import {
 	Dimensions,
 	StyleSheet,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
@@ -17,7 +18,7 @@ import FloatingRecordButton from '../components/FloatingRecordButton';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const TABS = [
-	{ key: 'home', label: 'Today', icon: 'sun' },
+	{ key: 'home', label: 'Home', icon: 'home' },
 	{ key: 'library', label: 'Library', icon: 'headphones' },
 ];
 
@@ -31,7 +32,7 @@ const TABS = [
 // Record is deliberately NOT a page or a nav-bar tab - it's only reachable through the
 // floating record button, which lives at this level so it stays fixed on screen (above the
 // nav bar) while swiping between Home and Library instead of belonging to either page.
-export default function HomeLibraryPager({ navigation }) {
+export default function HomeLibraryPager({ navigation, route }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
 	const scrollRef = useRef(null);
@@ -41,6 +42,19 @@ export default function HomeLibraryPager({ navigation }) {
 		scrollRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
 		setActiveIndex(index);
 	}, []);
+
+	// RecordScreen (and anywhere else) can ask to land on a specific page after navigating
+	// back here, e.g. navigation.navigate('Main', { initialPage: 1 }) to show Library right
+	// after saving a new recording. Consumed once, then cleared, so it doesn't keep forcing
+	// that page on every later return to Main.
+	useFocusEffect(
+		useCallback(() => {
+			if (route.params?.initialPage != null) {
+				goToPage(route.params.initialPage);
+				navigation.setParams({ initialPage: undefined });
+			}
+		}, [route.params?.initialPage, goToPage, navigation]),
+	);
 
 	const onMomentumScrollEnd = useCallback((e) => {
 		const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);

@@ -3,9 +3,10 @@ import { View, StyleSheet } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
-const CELL = 11;
 const GAP = 3;
 const ROWS = 7;
+const MIN_CELL = 9;
+const MAX_CELL = 20;
 
 function dateKeyLocal(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -22,6 +23,14 @@ function dateKeyLocal(d) {
 // scrollable multi-year view later.
 export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 	const { theme } = useTheme();
+
+	// Cell size is derived from the given width (not a fixed constant) so the grid always
+	// fills the full available width regardless of how many weeks are shown, clamped to a
+	// sensible range so cells don't become illegibly tiny or comically large.
+	const cell = Math.max(
+		MIN_CELL,
+		Math.min(MAX_CELL, Math.floor((width - (weeks - 1) * GAP) / weeks)),
+	);
 
 	const { cols, maxCount } = useMemo(() => {
 		const totalsByDay = {};
@@ -64,22 +73,22 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 		return withOpacity(theme.accent, step);
 	}
 
-	const gridWidth = cols.length * (CELL + GAP);
+	const gridWidth = weeks * cell + (weeks - 1) * GAP;
 
 	return (
 		<View style={styles.wrap}>
 			<Svg
-				width={Math.min(width, gridWidth)}
-				height={ROWS * (CELL + GAP)}
+				width={gridWidth}
+				height={ROWS * cell + (ROWS - 1) * GAP}
 			>
 				{cols.map((days, colIndex) =>
 					days.map((count, rowIndex) => (
 						<Rect
 							key={`${colIndex}-${rowIndex}`}
-							x={colIndex * (CELL + GAP)}
-							y={rowIndex * (CELL + GAP)}
-							width={CELL}
-							height={CELL}
+							x={colIndex * (cell + GAP)}
+							y={rowIndex * (cell + GAP)}
+							width={cell}
+							height={cell}
 							rx={2}
 							fill={colorFor(count)}
 						/>
