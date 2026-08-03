@@ -84,7 +84,7 @@ export async function backfillRecordingsToFolder(folderUri, onProgress) {
 export async function listEntries() {
 	const db = await getDb();
 	const entries = await db.getAllAsync(`
-    SELECT e.*, c.name as categoryName, c.color as categoryColor
+    SELECT e.*, c.name as categoryName, c.color as categoryColor, c.icon as categoryIcon
     FROM entries e
     LEFT JOIN categories c ON c.id = e.categoryId
     ORDER BY e.updatedAt DESC
@@ -107,7 +107,7 @@ export async function listEntries() {
 export async function getEntry(id) {
 	const db = await getDb();
 	const e = await db.getFirstAsync(
-		`SELECT e.*, c.name as categoryName, c.color as categoryColor FROM entries e
+		`SELECT e.*, c.name as categoryName, c.color as categoryColor, c.icon as categoryIcon FROM entries e
      LEFT JOIN categories c ON c.id = e.categoryId WHERE e.id = ?`,
 		[id],
 	);
@@ -280,7 +280,7 @@ export async function getExternalUrisForEntries(ids) {
 export async function getRecentEntries(limit = 5) {
 	const db = await getDb();
 	const rows = await db.getAllAsync(
-		`SELECT e.*, c.name as categoryName, c.color as categoryColor
+		`SELECT e.*, c.name as categoryName, c.color as categoryColor, c.icon as categoryIcon
      FROM entries e
      LEFT JOIN categories c ON c.id = e.categoryId
      ORDER BY e.updatedAt DESC

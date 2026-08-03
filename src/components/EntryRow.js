@@ -4,6 +4,7 @@ import Slider from '@react-native-community/slider';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { formatDuration, timeLabel, fullDateTimeLabel } from '../utils/format';
+import { UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';
 
 export default function EntryRow({
 	entry,
@@ -33,6 +34,8 @@ export default function EntryRow({
 					borderColor: isActiveHere
 						? entry.categoryColor || theme.accent
 						: theme.border,
+					borderLeftWidth: 4,
+					borderLeftColor: entry.categoryColor || UNTAGGED_COLOR,
 				},
 			]}
 		>
@@ -45,7 +48,7 @@ export default function EntryRow({
 						{entry.title}
 					</Text>
 					<Text style={[styles.subtitle, { color: theme.textMuted }]}>
-						{entry.categoryName || 'Untagged'} ·{' '}
+						{entry.categoryIcon || UNTAGGED_ICON} {entry.categoryName || 'Untagged'} ·{' '}
 						{showAbsoluteDate
 							? fullDateTimeLabel(entry.updatedAt)
 							: timeLabel(entry.updatedAt)}

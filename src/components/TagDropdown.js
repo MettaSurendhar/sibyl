@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { iconForCategory, colorForCategory, UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';
 
 // value: selected category object or null, categories: full list, onChange(category|null), onCreateNew(name)
 export default function TagDropdown({ label, value, categories, onChange, onCreateNew }) {
@@ -40,10 +41,19 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
         style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          {value && <View style={[styles.dot, { backgroundColor: value.color }]} />}
-          <Text style={{ color: value ? theme.text : theme.textMuted, fontSize: 15 }}>
-            {value ? value.name : 'Untagged (choose a tag...)'}
-          </Text>
+          {value ? (
+            <>
+              <View style={[styles.dot, { backgroundColor: colorForCategory(value) }]} />
+              <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(value)}</Text>
+              <Text style={{ color: theme.text, fontSize: 15 }}>{value.name}</Text>
+            </>
+          ) : (
+            <>
+              <View style={[styles.dot, { backgroundColor: UNTAGGED_COLOR }]} />
+              <Text style={{ fontSize: 16, marginRight: 8 }}>{UNTAGGED_ICON}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: 15 }}>Untagged (choose a tag...)</Text>
+            </>
+          )}
         </View>
         <Feather name="chevron-down" size={18} color={theme.textMuted} />
       </TouchableOpacity>
@@ -64,6 +74,8 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
             </View>
 
             <TouchableOpacity onPress={() => select(null)} style={styles.option}>
+              <View style={[styles.dot, { backgroundColor: UNTAGGED_COLOR }]} />
+              <Text style={{ fontSize: 16, marginRight: 8 }}>{UNTAGGED_ICON}</Text>
               <Text style={{ color: theme.textMuted }}>Untagged</Text>
             </TouchableOpacity>
 
@@ -73,7 +85,8 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
               style={{ maxHeight: 240 }}
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => select(item)} style={styles.option}>
-                  <View style={[styles.dot, { backgroundColor: item.color }]} />
+                  <View style={[styles.dot, { backgroundColor: colorForCategory(item) }]} />
+                  <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(item)}</Text>
                   <Text style={{ color: theme.text }}>{item.name}</Text>
                 </TouchableOpacity>
               )}

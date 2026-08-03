@@ -3,6 +3,7 @@
     "name": "Sibyl",
     "slug": "sibyl",
     "version": "1.0.0",
+    "jsEngine": "metta",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "sibyl",
