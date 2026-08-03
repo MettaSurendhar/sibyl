@@ -7,27 +7,43 @@ import {
 	DEFAULT_MERGE_TEMPLATE,
 	DEFAULT_APPEND_TEMPLATE,
 } from '../utils/naming';
+import {
+	colorForIndex,
+	DEFAULT_TAG_ICON,
+	UNTAGGED_COLOR,
+	UNTAGGED_ICON,
+} from '../utils/tagColors';
 
 export async function listCategories() {
 	const db = await getDb();
 	return db.getAllAsync('SELECT * FROM categories ORDER BY sortOrder ASC');
 }
 
-export async function createCategory({ name, prefix, color, nameTemplate }) {
+export async function createCategory({
+	name,
+	prefix,
+	color,
+	icon,
+	nameTemplate,
+}) {
 	const db = await getDb();
 	const id = newId('cat');
 	const countRow = await db.getFirstAsync(
 		'SELECT COUNT(*) as c FROM categories',
 	);
 	await db.runAsync(
-		'INSERT INTO categories (id, name, prefix, counter, color, sortOrder, nameTemplate) VALUES (?, ?, ?, 0, ?, ?, ?)',
+		'INSERT INTO categories (id, name, prefix, counter, color, sortOrder, nameTemplate, icon) VALUES (?, ?, ?, 0, ?, ?, ?, ?)',
 		[
 			id,
 			name,
 			prefix || name,
-			color || '#6C8EF5',
+			// Auto-assign the next palette color if none was chosen, rather than defaulting
+			// every new tag to the same blue - keeps Home boxes/charts distinguishable
+			// without forcing the user through the color picker.
+			color || colorForIndex(countRow.c),
 			countRow.c,
 			nameTemplate || DEFAULT_CATEGORY_TEMPLATE,
+			icon || DEFAULT_TAG_ICON,
 		],
 	);
 	return id;
@@ -35,12 +51,12 @@ export async function createCategory({ name, prefix, color, nameTemplate }) {
 
 export async function updateCategory(
 	id,
-	{ name, prefix, color, nameTemplate },
+	{ name, prefix, color, icon, nameTemplate },
 ) {
 	const db = await getDb();
 	await db.runAsync(
-		'UPDATE categories SET name = ?, prefix = ?, color = ?, nameTemplate = ? WHERE id = ?',
-		[name, prefix, color, nameTemplate, id],
+		'UPDATE categories SET name = ?, prefix = ?, color = ?, icon = ?, nameTemplate = ? WHERE id = ?',
+		[name, prefix, color, icon, nameTemplate, id],
 	);
 }
 
@@ -71,6 +87,32 @@ export async function getUntaggedEntryCount() {
 		'SELECT COUNT(*) as c FROM entries WHERE categoryId IS NULL',
 	);
 	return row?.c || 0;
+}
+
+// One row per tag (plus a trailing Untagged row), each with its live entry count, color and
+// icon already resolved. This is the single query the Home screen's tag boxes, and the pie
+// chart's slice list, both read from - one aggregate query rather than N+1 count calls.
+export async function getAllTagCounts() {
+	const db = await getDb();
+	const rows = await db.getAllAsync(`
+    SELECT c.id as id, c.name as name, c.icon as icon, c.color as color,
+           COUNT(e.id) as count
+    FROM categories c
+    LEFT JOIN entries e ON e.categoryId = c.id
+    GROUP BY c.id
+    ORDER BY c.sortOrder ASC
+  `);
+	const untaggedCount = await getUntaggedEntryCount();
+	return [
+		...rows,
+		{
+			id: null,
+			name: 'Untagged',
+			icon: UNTAGGED_ICON,
+			color: UNTAGGED_COLOR,
+			count: untaggedCount,
+		},
+	];
 }
 
 // Preview-only: what the name WOULD be if this category is chosen, without saving anything.

@@ -286,22 +286,18 @@ export async function getRecentEntries(limit = 5) {
 	return rows.map((e) => ({ ...e, waveform: JSON.parse(e.waveform || '[]') }));
 }
 
-// Counts consecutive calendar days (ending today) with at least one recording, based on
-// createdAt. Grace period: if nothing has been recorded yet today, the streak isn't zeroed
-// out until the day actually passes without an entry - it keeps counting from yesterday
-// backwards instead, so opening the app in the morning doesn't show "0" before you've had a
-// chance to record today.
-export async function getStreakCount() {
-	const db = await getDb();
-	const rows = await db.getAllAsync(
-		'SELECT createdAt FROM entries ORDER BY createdAt DESC',
-	);
-	if (!rows.length) return 0;
+const dayKey = (ms) => {
+	const d = new Date(ms);
+	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
 
-	const dayKey = (ms) => {
-		const d = new Date(ms);
-		return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-	};
+// Shared by getStreakCount and getStreakByCategory: counts consecutive calendar days
+// (ending today) present in a list of { createdAt } rows. Grace period: if nothing has
+// been recorded yet today, the streak isn't zeroed out until the day actually passes
+// without an entry - it keeps counting from yesterday backwards instead, so opening the
+// app in the morning doesn't show "0" before you've had a chance to record today.
+function streakFromRows(rows) {
+	if (!rows.length) return 0;
 	const days = new Set(rows.map((r) => dayKey(r.createdAt)));
 
 	const cursor = new Date();
@@ -316,6 +312,62 @@ export async function getStreakCount() {
 		cursor.setDate(cursor.getDate() - 1);
 	}
 	return streak;
+}
+
+// Overall streak across every tag - unchanged behavior from before, now backed by the
+// shared helper above.
+export async function getStreakCount() {
+	const db = await getDb();
+	const rows = await db.getAllAsync(
+		'SELECT createdAt FROM entries ORDER BY createdAt DESC',
+	);
+	return streakFromRows(rows);
+}
+
+// Same "consecutive days" streak, scoped to a single tag (or Untagged when categoryId is
+// null). Used by the Home screen's per-tag line in the streak chart, drawn alongside the
+// overall line from getStreakCount.
+export async function getStreakByCategory(categoryId) {
+	const db = await getDb();
+	const rows = categoryId
+		? await db.getAllAsync(
+				'SELECT createdAt FROM entries WHERE categoryId = ? ORDER BY createdAt DESC',
+				[categoryId],
+			)
+		: await db.getAllAsync(
+				'SELECT createdAt FROM entries WHERE categoryId IS NULL ORDER BY createdAt DESC',
+			);
+	return streakFromRows(rows);
+}
+
+// Per-day, per-tag entry counts between two timestamps (ms, inclusive). Shape:
+// [{ dateKey: 'YYYY-MM-DD', categoryId: <id|null>, count }]. Feeds both the Home streak
+// line chart (grouped per tag) and the GitHub-style heatmap (summed across tags for that
+// day). Aggregated in SQL via date() on createdAt so this stays one query rather than
+// looping over every entry in JS as the dataset grows into the hundreds/thousands.
+export async function getDailyEntryCounts({ from, to } = {}) {
+	const db = await getDb();
+	const where = [];
+	const params = [];
+	if (from != null) {
+		where.push('createdAt >= ?');
+		params.push(from);
+	}
+	if (to != null) {
+		where.push('createdAt <= ?');
+		params.push(to);
+	}
+	const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+	return db.getAllAsync(
+		`SELECT date(createdAt / 1000, 'unixepoch', 'localtime') as dateKey,
+            categoryId,
+            COUNT(*) as count
+     FROM entries
+     ${whereClause}
+     GROUP BY dateKey, categoryId
+     ORDER BY dateKey ASC`,
+		params,
+	);
 }
 
 // alsoDeleteExternal: when true, also deletes each segment's mirrored copy (if any) from the

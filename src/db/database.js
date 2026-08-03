@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { colorForIndex, DEFAULT_TAG_ICON } from '../utils/tagColors';
 
 let dbInstance = null;
 
@@ -77,26 +78,55 @@ export async function getDb() {
 		// column already exists
 	}
 
+	// migration: icon column on categories (emoji shown on Home tag boxes, Library rows, and
+	// tag pickers) - ignore if it already exists. NULL is handled at render time by
+	// utils/tagColors.iconForCategory, so no immediate backfill is required here beyond the
+	// one below for categories that predate this migration.
+	try {
+		await dbInstance.execAsync('ALTER TABLE categories ADD COLUMN icon TEXT');
+	} catch (e) {
+		// column already exists
+	}
+
+	// indexes for the Home screen's per-tag streaks, line chart, and heatmap - these all
+	// aggregate by createdAt/categoryId and should stay fast as entries grow into the
+	// hundreds/thousands rather than degrading into full table scans.
+	await dbInstance.execAsync(
+		'CREATE INDEX IF NOT EXISTS idx_entries_createdAt ON entries(createdAt)',
+	);
+	await dbInstance.execAsync(
+		'CREATE INDEX IF NOT EXISTS idx_entries_categoryId ON entries(categoryId)',
+	);
+
+	// backfill: any category created before the icon migration gets a stable default icon
+	// (rather than staying NULL forever) so old tags don't look "unfinished" next to newly
+	// created ones once Phase 3/4 start rendering icons everywhere.
+	await dbInstance.runAsync(
+		`UPDATE categories SET icon = ? WHERE icon IS NULL`,
+		[DEFAULT_TAG_ICON],
+	);
+
 	// seed default categories on first run
 	const row = await dbInstance.getFirstAsync(
 		'SELECT COUNT(*) as c FROM categories',
 	);
 	if (row.c === 0) {
 		const defaults = [
-			{ name: 'Diary', prefix: 'Diary' },
-			{ name: 'Thoughts', prefix: 'Thought' },
-			{ name: 'Rant', prefix: 'Rant' },
+			{ name: 'Diary', prefix: 'Diary', icon: '📔' },
+			{ name: 'Thoughts', prefix: 'Thought', icon: '💭' },
+			{ name: 'Rant', prefix: 'Rant', icon: '😤' },
 		];
 		for (let i = 0; i < defaults.length; i++) {
 			await dbInstance.runAsync(
-				'INSERT INTO categories (id, name, prefix, counter, color, sortOrder, nameTemplate) VALUES (?, ?, ?, 0, ?, ?, ?)',
+				'INSERT INTO categories (id, name, prefix, counter, color, sortOrder, nameTemplate, icon) VALUES (?, ?, ?, 0, ?, ?, ?, ?)',
 				[
 					`cat_${Date.now()}_${i}`,
 					defaults[i].name,
 					defaults[i].prefix,
-					['#6C8EF5', '#F5A65C', '#E56C6C'][i],
+					colorForIndex(i),
 					i,
 					'{tag} <count>',
+					defaults[i].icon,
 				],
 			);
 		}
