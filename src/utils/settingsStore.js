@@ -19,6 +19,9 @@ export async function setGroqApiKey(key) {
 const DEFAULT_PREFS = {
 	recordingFormat: 'aac', // 'aac' | 'wav' | 'mp3' (mp3 requires the ffmpeg transcode module)
 	shareFormat: 'mp3',
+	// Remembered screen position of the floating record button (Home/Library pager), set
+	// after a long-press-drag. null means "use the default bottom-right position".
+	fabPosition: null,
 };
 
 export async function getPrefs() {

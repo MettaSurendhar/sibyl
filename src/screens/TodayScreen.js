@@ -14,9 +14,10 @@ import { getStreakCount, getRecentEntries } from '../db/entries';
 import { formatDuration, dateGroupLabel, timeLabel } from '../utils/format';
 import { greetingForNow } from '../components/HomeHeader';
 
-// Bigger, structural version of the Record-screen context header: a dedicated landing tab
-// showing streak + the last few recordings, with a floating record button that routes into the
-// existing Record screen/tab rather than duplicating any recording logic here.
+// NOTE: this screen's content (greeting/streak/recent-list) is unchanged from before -
+// only its own floating record button was removed, since HomeLibraryPager now renders one
+// persistent FloatingRecordButton above both Home and Library. Full content redesign
+// (tag boxes + charts) is Phase 2, not this pass.
 export default function TodayScreen({ navigation }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
@@ -116,20 +117,6 @@ export default function TodayScreen({ navigation }) {
 					</TouchableOpacity>
 				)}
 			/>
-
-			<TouchableOpacity
-				style={[
-					styles.fab,
-					{ backgroundColor: theme.accent, bottom: insets.bottom + 24 },
-				]}
-				onPress={() => navigation.navigate('Record')}
-			>
-				<Feather
-					name='mic'
-					size={26}
-					color='#fff'
-				/>
-			</TouchableOpacity>
 		</View>
 	);
 }
@@ -176,18 +163,4 @@ const styles = StyleSheet.create({
 		marginBottom: 4,
 	},
 	emptySubtitle: { fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },
-	fab: {
-		position: 'absolute',
-		right: 20,
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		alignItems: 'center',
-		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 6,
-		elevation: 6,
-	},
 });

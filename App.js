@@ -7,7 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { AlertProvider } from './src/theme/AlertContext';
 import { getDb } from './src/db/database';
-import BottomTabs from './src/navigation/BottomTabs';
+import HomeLibraryPager from './src/navigation/HomeLibraryPager';
+import RecordScreen from './src/screens/RecordScreen';
 import PlaybackScreen from './src/screens/PlaybackScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
 import TrimScreen from './src/screens/TrimScreen';
@@ -51,7 +52,12 @@ function Root() {
 			<Stack.Navigator screenOptions={{ headerShown: false }}>
 				<Stack.Screen
 					name='Main'
-					component={BottomTabs}
+					component={HomeLibraryPager}
+				/>
+				<Stack.Screen
+					name='Record'
+					component={RecordScreen}
+					options={{ presentation: 'modal' }}
 				/>
 				<Stack.Screen
 					name='Playback'

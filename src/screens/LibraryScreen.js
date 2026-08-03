@@ -1,10 +1,4 @@
-import React, {
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
 	View,
 	Text,
@@ -115,15 +109,6 @@ export default function LibraryScreen({ navigation }) {
 			return () => sub.remove();
 		}, [menuOpen, searchOpen, editMode]),
 	);
-
-	// Hide the bottom tab bar while in edit/selection mode.
-	useEffect(() => {
-		navigation.setOptions({
-			tabBarStyle: editMode
-				? { display: 'none' }
-				: { backgroundColor: theme.surface, borderTopColor: theme.border },
-		});
-	}, [editMode, navigation, theme]);
 
 	const filtered = useMemo(() => {
 		let list = entries;
