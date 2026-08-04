@@ -8,16 +8,18 @@
 // truth instead of each screen guessing its own fallback.
 
 export const TAG_COLOR_PALETTE = [
-	'#6C8EF5', // blue
-	'#F5A65C', // orange
-	'#E56C6C', // red
-	'#5CC9A7', // teal
-	'#B87CE0', // purple
-	'#E0C15C', // yellow
-	'#6CC5E5', // sky
-	'#E07CA5', // pink
-	'#8CD16C', // green
-	'#C98CE0', // lavender
+	// Blues & Indigos
+	'#6C8EF5', '#4F6FD4', '#7EB8F7', '#A0C4FF', '#3D72B4',
+	// Purples
+	'#B87CE0', '#C98CE0', '#9B59B6', '#D4A0F5', '#7B2FBE',
+	// Pinks & Reds
+	'#E07CA5', '#E56C6C', '#FF7096', '#FF5A87', '#C0392B',
+	// Oranges & Yellows
+	'#F5A65C', '#F39C12', '#FFBE76', '#E0C15C', '#FFD700',
+	// Greens & Teals
+	'#5CC9A7', '#8CD16C', '#27AE60', '#6CC5E5', '#1ABC9C',
+	// Neutrals
+	'#95A5A6', '#BDC3C7', '#7F8C8D', '#AAB7B8',
 ];
 
 // A reasonably broad, journal-relevant set to start the emoji picker with. Manage Tags

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
 import StreakLineChart from './StreakLineChart';
 import TagPieChart from './TagPieChart';
@@ -10,9 +11,9 @@ const PAGE_PADDING = 16;
 const CHART_WIDTH = SCREEN_WIDTH - PAGE_PADDING * 2;
 
 const TABS = [
-	{ key: 'line', label: 'Activity', icon: '📈' },
-	{ key: 'pie', label: 'Breakdown', icon: '🥧' },
-	{ key: 'heatmap', label: 'Heatmap', icon: '🗓️' },
+	{ key: 'line', label: 'Activity', icon: 'trending-up' },
+	{ key: 'pie', label: 'Breakdown', icon: 'pie-chart' },
+	{ key: 'heatmap', label: 'Heatmap', icon: 'calendar' },
 ];
 
 export default function GraphCarousel({
@@ -41,7 +42,7 @@ export default function GraphCarousel({
 							]}
 							activeOpacity={0.7}
 						>
-							<Text style={styles.tabIcon}>{tab.icon}</Text>
+							<Feather name={tab.icon} size={18} color={active ? theme.accent : theme.textMuted} />
 							<Text style={[styles.tabLabel, { color: active ? theme.accent : theme.textMuted }]}>
 								{tab.label}
 							</Text>
@@ -93,9 +94,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingVertical: 10,
 		borderRadius: 10,
-		gap: 2,
+		gap: 4,
 	},
-	tabIcon: { fontSize: 18 },
 	tabLabel: { fontSize: 11, fontWeight: '700' },
 	chartContainer: {
 		borderWidth: 1,

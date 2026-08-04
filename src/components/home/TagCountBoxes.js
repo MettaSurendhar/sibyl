@@ -2,10 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 
-// Grid of "how many recordings does each tag have" boxes, replacing the old plain
-// "RECENT ENTRIES" list per the phase plan. Each box uses the tag's own color/icon (set in
-// Manage Tags, Phase 3) as a left accent stripe, so a tag's identity is consistent here and
-// wherever else it appears (Library rows, tag pickers - Phase 4).
 export default function TagCountBoxes({ tags }) {
 	const { theme } = useTheme();
 	if (!tags.length) return null;
@@ -20,12 +16,14 @@ export default function TagCountBoxes({ tags }) {
 						{
 							backgroundColor: theme.surface,
 							borderColor: theme.border,
-							borderLeftColor: tag.color,
+							borderTopColor: tag.color,
 						},
 					]}
 				>
-					<Text style={styles.icon}>{tag.icon}</Text>
-					<Text style={[styles.count, { color: theme.text }]}>{tag.count}</Text>
+					<View style={styles.countRow}>
+						<Text style={[styles.count, { color: theme.text }]}>{tag.count}</Text>
+						<Text style={styles.icon}>{tag.icon}</Text>
+					</View>
 					<Text
 						style={[styles.name, { color: theme.textMuted }]}
 						numberOfLines={1}
@@ -48,12 +46,20 @@ const styles = StyleSheet.create({
 	box: {
 		width: '46%',
 		margin: '2%',
-		borderRadius: 14,
+		borderRadius: 16,
 		borderWidth: 1,
-		borderLeftWidth: 4,
-		padding: 14,
+		borderTopWidth: 6,
+		padding: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	icon: { fontSize: 20, marginBottom: 6 },
-	count: { fontSize: 22, fontWeight: '700' },
-	name: { fontSize: 13, marginTop: 2 },
+	countRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 6,
+		gap: 6,
+	},
+	count: { fontSize: 34, fontWeight: '800' },
+	icon: { fontSize: 24 },
+	name: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });

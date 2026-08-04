@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
 	View,
 	Text,
@@ -11,6 +11,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { themeList } from '../../theme/themes';
 import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
+import { getPrefs, setPrefs } from '../../utils/settingsStore';
 
 // Small 3-color swatch pill (background / surface / accent) pulled straight from each theme's
 // existing palette - makes light themes (Paper/Slate/Sand) easier to tell apart at a glance
@@ -28,6 +29,18 @@ function ThemeSwatch({ theme: t }) {
 export default function AppearanceSettingsScreen({ navigation }) {
 	const { theme, themeKey, setThemeKey } = useTheme();
 	const insets = useSafeAreaInsets();
+	const [streakDays, setStreakDays] = useState(14);
+
+	useEffect(() => {
+		getPrefs().then((p) => {
+			if (p.streakDays) setStreakDays(p.streakDays);
+		});
+	}, []);
+
+	async function updateStreakDays(val) {
+		setStreakDays(val);
+		await setPrefs({ streakDays: val });
+	}
 
 	return (
 		<ScrollView
@@ -57,6 +70,25 @@ export default function AppearanceSettingsScreen({ navigation }) {
 						<Text style={{ color: theme.text, flex: 1, marginLeft: 12 }}>
 							{t.label}
 						</Text>
+					</TouchableOpacity>
+				))}
+			</SettingsSection>
+
+			<SettingsSection title='Dashboard Streak Tracker'>
+				{[7, 14, 30].map((days) => (
+					<TouchableOpacity
+						key={days}
+						style={[
+							styles.optionRow,
+							{
+								borderColor: theme.border,
+								backgroundColor:
+									streakDays === days ? theme.surfaceAlt : 'transparent',
+							},
+						]}
+						onPress={() => updateStreakDays(days)}
+					>
+						<Text style={{ color: theme.text, flex: 1 }}>{days} days</Text>
 					</TouchableOpacity>
 				))}
 			</SettingsSection>

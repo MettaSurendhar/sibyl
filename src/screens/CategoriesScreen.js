@@ -176,19 +176,26 @@ export default function CategoriesScreen({ navigation }) {
               </View>
 
               <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Icon</Text>
-              <View style={styles.emojiRow}>
-                {TAG_EMOJI_PRESETS.map((emoji) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    onPress={() => setEditIcon(emoji)}
-                    style={[
-                      styles.emojiBtn,
-                      { backgroundColor: editIcon === emoji ? theme.surfaceAlt : 'transparent' }
-                    ]}
-                  >
-                    <Text style={{ fontSize: 20 }}>{emoji}</Text>
+              <View style={[styles.emojiInputRow, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+                <Text style={styles.emojiPreview}>{editIcon || '🏷️'}</Text>
+                <TextInput
+                  value={editIcon}
+                  onChangeText={(v) => {
+                    // grab only the first emoji character typed
+                    const chars = [...(v || '')];
+                    if (chars.length > 0) setEditIcon(chars[0]);
+                    else setEditIcon('');
+                  }}
+                  placeholder="Tap to pick an emoji from keyboard"
+                  placeholderTextColor={theme.textMuted}
+                  style={{ flex: 1, color: theme.text, fontSize: 15 }}
+                  maxLength={8}
+                />
+                {editIcon ? (
+                  <TouchableOpacity onPress={() => setEditIcon('')}>
+                    <Feather name="x" size={16} color={theme.textMuted} />
                   </TouchableOpacity>
-                ))}
+                ) : null}
               </View>
 
               <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Naming format</Text>
@@ -282,6 +289,6 @@ const styles = StyleSheet.create({
   btn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   colorSwatch: { width: 30, height: 30, borderRadius: 15 },
-  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
-  emojiBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  emojiInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14, gap: 10 },
+  emojiPreview: { fontSize: 24 },
 });

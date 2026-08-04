@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { getAllTagCounts, getPieBreakdown } from '../db/categories';
 import { getStreakCount, getDailyEntryCounts } from '../db/entries';
+import { getPrefs } from '../utils/settingsStore';
 import TagCountBoxes from '../components/home/TagCountBoxes';
 import GraphCarousel from '../components/home/GraphCarousel';
 
@@ -19,7 +20,6 @@ function dateKeyLocal(d) {
 	).padStart(2, '0')}`;
 }
 
-// Computes last N days as {date, hasRecording} for the streak tracker row.
 function buildStreakDays(dailyRows, count) {
 	const totalsByDay = {};
 	for (const row of dailyRows) {
@@ -43,6 +43,7 @@ export default function TodayScreen({ navigation }) {
 	const [overallStreak, setOverallStreak] = useState(0);
 	const [dailyRows, setDailyRows] = useState([]);
 	const [pieSlices, setPieSlices] = useState([]);
+	const [streakDays, setStreakDays] = useState(14);
 
 	const refresh = useCallback(() => {
 		const now = Date.now();
@@ -52,11 +53,13 @@ export default function TodayScreen({ navigation }) {
 			getStreakCount(),
 			getDailyEntryCounts({ from: heatmapFrom, to: now }),
 			getPieBreakdown(),
-		]).then(([tags, streak, daily, pie]) => {
+			getPrefs(),
+		]).then(([tags, streak, daily, pie, prefs]) => {
 			setTagCounts(tags);
 			setOverallStreak(streak);
 			setDailyRows(daily);
 			setPieSlices(pie);
+			setStreakDays(prefs.streakDays || 14);
 		});
 	}, []);
 
@@ -66,7 +69,7 @@ export default function TodayScreen({ navigation }) {
 		}, [refresh]),
 	);
 
-	const streakDays = buildStreakDays(dailyRows, 14);
+	const streakDotList = buildStreakDays(dailyRows, streakDays);
 
 	return (
 		<ScrollView
@@ -92,7 +95,7 @@ export default function TodayScreen({ navigation }) {
 			{/* Tag count boxes */}
 			<TagCountBoxes tags={tagCounts} />
 
-			{/* Streak tracker widget */}
+			{/* Streak tracker */}
 			<View style={[styles.streakCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
 				<View style={styles.streakHeader}>
 					<View style={styles.streakTitleRow}>
@@ -101,18 +104,16 @@ export default function TodayScreen({ navigation }) {
 							{overallStreak > 0 ? `${overallStreak}-day streak` : 'No streak yet'}
 						</Text>
 					</View>
-					<Text style={[styles.streakSub, { color: theme.textMuted }]}>last 14 days</Text>
+					<Text style={[styles.streakSub, { color: theme.textMuted }]}>last {streakDays} days</Text>
 				</View>
 				<View style={styles.streakDots}>
-					{streakDays.map((day, i) => (
+					{streakDotList.map((day) => (
 						<View
 							key={day.key}
 							style={[
 								styles.streakDot,
 								{
-									backgroundColor: day.hasRecording
-										? theme.accent
-										: theme.border,
+									backgroundColor: day.hasRecording ? theme.accent : theme.border,
 									opacity: day.hasRecording ? 1 : 0.5,
 								},
 							]}
@@ -160,7 +161,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	// Streak card
 	streakCard: {
 		marginHorizontal: 16,
 		marginBottom: 16,
@@ -177,21 +177,9 @@ const styles = StyleSheet.create({
 	streakTitleRow: { flexDirection: 'row', alignItems: 'center' },
 	streakTitle: { fontSize: 14, fontWeight: '700' },
 	streakSub: { fontSize: 11 },
-	streakDots: {
-		flexDirection: 'row',
-		gap: 5,
-		flexWrap: 'wrap',
-	},
-	streakDot: {
-		width: 14,
-		height: 14,
-		borderRadius: 7,
-	},
-	streakFooter: {
-		flexDirection: 'row',
-		gap: 16,
-		marginTop: 10,
-	},
+	streakDots: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+	streakDot: { width: 14, height: 14, borderRadius: 7 },
+	streakFooter: { flexDirection: 'row', gap: 16, marginTop: 10 },
 	streakLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 	streakLegendDot: { width: 8, height: 8, borderRadius: 4 },
 	streakLegendText: { fontSize: 11 },

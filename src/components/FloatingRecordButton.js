@@ -57,13 +57,17 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 	}
 
-	const clampX = (x) =>
-		Math.max(MARGIN, Math.min(screenW - BUTTON_SIZE - MARGIN, x));
-	const clampY = (y) =>
-		Math.max(
+	const clampX = (x) => {
+		'worklet';
+		return Math.max(MARGIN, Math.min(screenW - BUTTON_SIZE - MARGIN, x));
+	};
+	const clampY = (y) => {
+		'worklet';
+		return Math.max(
 			insets.top + MARGIN,
 			Math.min(screenH - BUTTON_SIZE - MARGIN - bottomOffset, y),
 		);
+	};
 
 	const longPress = Gesture.LongPress()
 		.minDuration(350)

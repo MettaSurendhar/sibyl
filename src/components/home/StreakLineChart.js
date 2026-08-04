@@ -81,10 +81,10 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 		<View>
 			<Svg width={width} height={CHART_HEIGHT}>
 				{/* Y gridlines and labels */}
-				{yTicks.map((val) => {
+				{yTicks.map((val, ti) => {
 					const y = PADDING_TOP + plotHeight - (val / maxValue) * plotHeight;
 					return (
-						<React.Fragment key={`y-${val}`}>
+						<React.Fragment key={`y-tick-${ti}`}>
 							<Line
 								x1={PADDING_LEFT}
 								y1={y}

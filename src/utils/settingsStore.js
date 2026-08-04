@@ -22,6 +22,8 @@ const DEFAULT_PREFS = {
 	// Remembered screen position of the floating record button (Home/Library pager), set
 	// after a long-press-drag. null means "use the default bottom-right position".
 	fabPosition: null,
+	// Number of days shown in the streak tracker on the Home dashboard (7, 14, or 30).
+	streakDays: 14,
 };
 
 export async function getPrefs() {
