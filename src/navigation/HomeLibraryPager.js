@@ -37,6 +37,7 @@ export default function HomeLibraryPager({ navigation, route }) {
 	const insets = useSafeAreaInsets();
 	const scrollRef = useRef(null);
 	const [activeIndex, setActiveIndex] = useState(0);
+	const [libraryEditMode, setLibraryEditMode] = useState(false);
 
 	const goToPage = useCallback((index) => {
 		scrollRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
@@ -78,45 +79,53 @@ export default function HomeLibraryPager({ navigation, route }) {
 					<TodayScreen navigation={navigation} />
 				</View>
 				<View style={{ width: SCREEN_WIDTH }}>
-					<LibraryScreen navigation={navigation} />
+					<LibraryScreen 
+						navigation={navigation} 
+						isEditMode={libraryEditMode}
+						onEditModeChange={setLibraryEditMode}
+					/>
 				</View>
 			</ScrollView>
 
-			<View
-				style={[
-					styles.tabBar,
-					{
-						height: tabBarHeight,
-						paddingBottom: insets.bottom,
-						backgroundColor: theme.surface,
-						borderTopColor: theme.border,
-					},
-				]}
-			>
-				{TABS.map((tab, index) => {
-					const active = activeIndex === index;
-					const color = active ? theme.accent : theme.textMuted;
-					return (
-						<TouchableOpacity
-							key={tab.key}
-							style={styles.tabItem}
-							onPress={() => goToPage(index)}
-						>
-							<Feather
-								name={tab.icon}
-								size={22}
-								color={color}
-							/>
-							<Text style={[styles.tabLabel, { color }]}>{tab.label}</Text>
-						</TouchableOpacity>
-					);
-				})}
-			</View>
+			{!libraryEditMode && (
+				<View
+					style={[
+						styles.tabBar,
+						{
+							height: tabBarHeight,
+							paddingBottom: insets.bottom,
+							backgroundColor: theme.surface,
+							borderTopColor: theme.border,
+						},
+					]}
+				>
+					{TABS.map((tab, index) => {
+						const active = activeIndex === index;
+						const color = active ? theme.accent : theme.textMuted;
+						return (
+							<TouchableOpacity
+								key={tab.key}
+								style={styles.tabItem}
+								onPress={() => goToPage(index)}
+							>
+								<Feather
+									name={tab.icon}
+									size={22}
+									color={color}
+								/>
+								<Text style={[styles.tabLabel, { color }]}>{tab.label}</Text>
+							</TouchableOpacity>
+						);
+					})}
+				</View>
+			)}
 
-			<FloatingRecordButton
-				onPress={() => navigation.navigate('Record')}
-				bottomOffset={tabBarHeight + 16}
-			/>
+			{!libraryEditMode && (
+				<FloatingRecordButton
+					onPress={() => navigation.navigate('Record')}
+					bottomOffset={tabBarHeight + 16}
+				/>
+			)}
 		</View>
 	);
 }

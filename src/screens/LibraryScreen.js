@@ -46,7 +46,7 @@ if (
 
 const EMPTY_FILTER = { tagIds: [], datePreset: null, customRange: null };
 
-export default function LibraryScreen({ navigation }) {
+export default function LibraryScreen({ navigation, isEditMode, onEditModeChange }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
 	const insets = useSafeAreaInsets();
@@ -57,7 +57,9 @@ export default function LibraryScreen({ navigation }) {
 	const [filterOpen, setFilterOpen] = useState(false);
 	const [filter, setFilter] = useState(EMPTY_FILTER);
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [editMode, setEditMode] = useState(false);
+	
+	const editMode = isEditMode || false;
+	const setEditMode = onEditModeChange || (() => {});
 	const [selectedIds, setSelectedIds] = useState([]);
 	const [activeEntryId, setActiveEntryId] = useState(null);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -431,12 +433,13 @@ export default function LibraryScreen({ navigation }) {
 			)}
 
 			<SectionList
+				style={{ flex: 1 }}
 				sections={sections}
 				keyExtractor={(item) => item.id}
 				stickySectionHeadersEnabled={false}
 				contentContainerStyle={{
 					padding: 16,
-					paddingBottom: editMode ? 120 : 16,
+					paddingBottom: 16,
 				}}
 				renderSectionHeader={({ section }) => (
 					<Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
@@ -484,6 +487,7 @@ export default function LibraryScreen({ navigation }) {
 						{
 							backgroundColor: theme.surface,
 							borderColor: theme.border,
+							borderTopWidth: 1,
 							paddingBottom: insets.bottom + 14,
 							opacity: selectedIds.length ? 1 : 0.4,
 						},
@@ -674,13 +678,9 @@ const styles = StyleSheet.create({
 		letterSpacing: 0.5,
 	},
 	actionBar: {
-		position: 'absolute',
-		bottom: 0,
-		left: 0,
-		right: 0,
 		flexDirection: 'row',
 		justifyContent: 'space-around',
-		borderTopWidth: 1,
+		borderTopWidth: StyleSheet.hairlineWidth,
 		paddingVertical: 16,
 	},
 	actionBtn: { alignItems: 'center' },

@@ -5,6 +5,7 @@ import {
 	Pressable,
 	StyleSheet,
 	ScrollView,
+	Modal,
 	BackHandler,
 	useWindowDimensions,
 } from 'react-native';
@@ -78,6 +79,8 @@ export default function PlaybackScreen({ route, navigation }) {
 	const [deleteFromFolderModalVisible, setDeleteFromFolderModalVisible] =
 		useState(false);
 	const [folderNameForDelete, setFolderNameForDelete] = useState('');
+	const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+	const [detailsData, setDetailsData] = useState(null);
 	const playerRef = useRef(null);
 	const entryRef = useRef(null);
 	const pagerRef = useRef(null);
@@ -235,22 +238,46 @@ export default function PlaybackScreen({ route, navigation }) {
 				const info = await FileSystem.getInfoAsync(seg.uri);
 				if (info.exists) totalSizeBytes += info.size || 0;
 			}
-			const sizeStr = totalSizeBytes > 1024 * 1024 
+			const sizeStr = totalSizeBytes > 1024 * 1024
 				? (totalSizeBytes / (1024 * 1024)).toFixed(2) + ' MB'
 				: (totalSizeBytes / 1024).toFixed(2) + ' KB';
 
-			const path = entry.segments.length === 1 ? entry.segments[0].uri : `${entry.segments.length} segments stored internally`;
+			// The internal app path for the audio file(s)
+			const internalUri = entry.segments.length === 1
+				? entry.segments[0].uri
+				: `${entry.segments.length} segments stored internally`;
 
-			alert(
-				'Details',
-				`Name:\n${entry.title}\n\nTime:\n${new Date(entry.createdAt).toLocaleString()}\n\nDuration:\n${formatDuration(entry.totalDurationMs)}\n\nSize:\n${sizeStr}\n\nPath:\n${path}`,
-			);
-		} catch(e) {
-			alert(
-				'Details',
-				`Name:\n${entry.title}\n\nTime:\n${new Date(entry.createdAt).toLocaleString()}\n\nDuration:\n${formatDuration(entry.totalDurationMs)}`,
-			);
+			// User-configured save folders (may be null if not set)
+			const recFolderUri = await getRecordingsFolderUri();
+			const transcriptFolderUri = await getTranscriptFolderUri();
+
+			const friendlyFolder = (uri) => {
+				if (!uri) return 'Not set';
+				// Strip content:// or file:// scheme for readability
+				return uri.replace(/^(content|file):\/\/[^/]*/, '');
+			};
+
+			setDetailsData({
+				name: entry.title,
+				time: new Date(entry.createdAt).toLocaleString(),
+				duration: formatDuration(entry.totalDurationMs),
+				size: sizeStr,
+				appPath: internalUri,
+				recordingsFolder: friendlyFolder(recFolderUri),
+				transcriptFolder: friendlyFolder(transcriptFolderUri),
+			});
+		} catch (e) {
+			setDetailsData({
+				name: entry.title,
+				time: new Date(entry.createdAt).toLocaleString(),
+				duration: formatDuration(entry.totalDurationMs),
+				size: '—',
+				appPath: '—',
+				recordingsFolder: '—',
+				transcriptFolder: '—',
+			});
 		}
+		setDetailsSheetOpen(true);
 	}
 
 	function handleDelete() {
@@ -901,6 +928,46 @@ export default function PlaybackScreen({ route, navigation }) {
 				onClose={() => setSettingsOpen(false)}
 			/>
 
+			{/* ---- Details bottom sheet ---- */}
+			{detailsSheetOpen && detailsData && (
+				<Modal
+					visible={detailsSheetOpen}
+					transparent
+					animationType='slide'
+					onRequestClose={() => setDetailsSheetOpen(false)}
+				>
+					<Pressable
+						style={styles.detailsBackdrop}
+						onPress={() => setDetailsSheetOpen(false)}
+					/>
+					<View style={[styles.detailsSheet, { backgroundColor: theme.surface }]}>
+						<View style={styles.detailsHandleBar} />
+						<View style={styles.detailsHeaderRow}>
+							<Text style={[styles.detailsTitle, { color: theme.text }]}>Details</Text>
+							<TouchableOpacity onPress={() => setDetailsSheetOpen(false)}>
+								<Feather name='x' size={20} color={theme.textMuted} />
+							</TouchableOpacity>
+						</View>
+						<ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+							{[
+								{ label: 'Name', value: detailsData.name },
+								{ label: 'Created', value: detailsData.time },
+								{ label: 'Duration', value: detailsData.duration },
+								{ label: 'Size', value: detailsData.size },
+								{ label: 'App Path', value: detailsData.appPath },
+								{ label: 'Recordings Save Folder', value: detailsData.recordingsFolder },
+								{ label: 'Transcript Download Folder', value: detailsData.transcriptFolder },
+							].map(({ label, value }) => (
+								<View key={label} style={[styles.detailsRow, { borderBottomColor: theme.border }]}>
+									<Text style={[styles.detailsLabel, { color: theme.textMuted }]}>{label}</Text>
+									<Text style={[styles.detailsValue, { color: theme.text }]} selectable>{value}</Text>
+								</View>
+							))}
+						</ScrollView>
+					</View>
+				</Modal>
+			)}
+
 			<EntryTagSheet
 				visible={tagSheetOpen}
 				categories={categories}
@@ -1035,4 +1102,36 @@ const styles = StyleSheet.create({
 		gap: 4,
 	},
 	transcriptActionBtn: { padding: 8 },
+	// Details sheet
+	detailsBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+	},
+	detailsSheet: {
+		padding: 20,
+		paddingBottom: 36,
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+	},
+	detailsHandleBar: {
+		width: 40,
+		height: 4,
+		borderRadius: 2,
+		backgroundColor: 'rgba(255,255,255,0.2)',
+		alignSelf: 'center',
+		marginBottom: 16,
+	},
+	detailsHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 16,
+	},
+	detailsTitle: { fontSize: 18, fontWeight: '700' },
+	detailsRow: {
+		paddingVertical: 12,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+	},
+	detailsLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+	detailsValue: { fontSize: 14, lineHeight: 20 },
 });
