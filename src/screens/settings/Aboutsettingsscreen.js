@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
@@ -31,11 +32,37 @@ export default function AboutSettingsScreen({ navigation }) {
 			>
 				<Text style={{ color: theme.textMuted }}>Sibyl — v1.0.0</Text>
 				<Text
-					style={{ color: theme.textMuted, fontStyle: 'italic', marginTop: 2 }}
+					style={{ color: theme.textMuted, fontStyle: 'italic', marginTop: 2, marginBottom: 12 }}
 				>
 					speak, and be remembered
 				</Text>
 			</SettingsSection>
+
+			<SettingsSection title='Legal'>
+				<TouchableOpacity style={[styles.optionRow, { borderColor: theme.border }]}>
+					<Text style={{ color: theme.text, flex: 1 }}>Privacy Policy</Text>
+					<Feather name="chevron-right" size={18} color={theme.textMuted} />
+				</TouchableOpacity>
+				<TouchableOpacity style={[styles.optionRow, { borderColor: theme.border }]}>
+					<Text style={{ color: theme.text, flex: 1 }}>Terms of Service</Text>
+					<Feather name="chevron-right" size={18} color={theme.textMuted} />
+				</TouchableOpacity>
+				<TouchableOpacity style={[styles.optionRow, { borderColor: theme.border }]}>
+					<Text style={{ color: theme.text, flex: 1 }}>Open Source Licenses</Text>
+					<Feather name="chevron-right" size={18} color={theme.textMuted} />
+				</TouchableOpacity>
+			</SettingsSection>
 		</ScrollView>
 	);
 }
+
+const styles = StyleSheet.create({
+	optionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 12,
+		marginBottom: 8,
+	},
+});

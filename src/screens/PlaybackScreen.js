@@ -227,12 +227,30 @@ export default function PlaybackScreen({ route, navigation }) {
 		}
 	}
 
-	function handleDetails() {
+	async function handleDetails() {
 		setMenuOpen(false);
-		alert(
-			'Details',
-			`Category: ${entry.categoryName || 'Untagged'}\nDuration: ${formatDuration(entry.totalDurationMs)}\nSegments: ${entry.segments.length}\nCreated: ${new Date(entry.createdAt).toLocaleString()}`,
-		);
+		try {
+			let totalSizeBytes = 0;
+			for (const seg of entry.segments) {
+				const info = await FileSystem.getInfoAsync(seg.uri);
+				if (info.exists) totalSizeBytes += info.size || 0;
+			}
+			const sizeStr = totalSizeBytes > 1024 * 1024 
+				? (totalSizeBytes / (1024 * 1024)).toFixed(2) + ' MB'
+				: (totalSizeBytes / 1024).toFixed(2) + ' KB';
+
+			const path = entry.segments.length === 1 ? entry.segments[0].uri : `${entry.segments.length} segments stored internally`;
+
+			alert(
+				'Details',
+				`Name:\n${entry.title}\n\nTime:\n${new Date(entry.createdAt).toLocaleString()}\n\nDuration:\n${formatDuration(entry.totalDurationMs)}\n\nSize:\n${sizeStr}\n\nPath:\n${path}`,
+			);
+		} catch(e) {
+			alert(
+				'Details',
+				`Name:\n${entry.title}\n\nTime:\n${new Date(entry.createdAt).toLocaleString()}\n\nDuration:\n${formatDuration(entry.totalDurationMs)}`,
+			);
+		}
 	}
 
 	function handleDelete() {
