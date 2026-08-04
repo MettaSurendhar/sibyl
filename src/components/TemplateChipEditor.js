@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
 	View,
-	Text,
 	TouchableOpacity,
 	StyleSheet,
 	Modal,
 } from 'react-native';
+import Text from '../theme/Text';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';

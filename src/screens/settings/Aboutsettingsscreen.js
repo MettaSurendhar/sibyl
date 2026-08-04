@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
+import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 import SettingsHeader from '../../components/SettingsHeader';

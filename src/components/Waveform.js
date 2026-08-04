@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, PanResponder } from 'react-native';
+import { View, StyleSheet, Animated, Easing, PanResponder } from 'react-native';
+import Text from '../theme/Text';
 
 const SAMPLE_INTERVAL_MS = 100;
 const MAX_BARS = 60;

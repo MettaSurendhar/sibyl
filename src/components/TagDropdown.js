@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal } from 'react-native';
+import { View, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal } from 'react-native';
+import Text from '../theme/Text';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { iconForCategory, colorForCategory, UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';

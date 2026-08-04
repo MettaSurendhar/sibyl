@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
 	View,
-	Text,
 	TouchableOpacity,
 	ScrollView,
 	StyleSheet,
 	Platform,
 } from 'react-native';
+import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, TouchableOpacity, StyleSheet } from 'react-native';
+import Text from '../theme/Text';
 import { useTheme } from '../theme/ThemeContext';
 
 // visible, title, message, cancelLabel, confirmLabel, destructive, onCancel, onConfirm

@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { useFonts, PlayfairDisplay_400Regular, PlayfairDisplay_500Medium, PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
+import { Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
+import { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold } from '@expo-google-fonts/nunito';
+
+// Font loaded globally via src/theme/Text component
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -106,6 +113,16 @@ function Root() {
 }
 
 export default function App() {
+	const [fontsLoaded] = useFonts({
+		PlayfairDisplay_400Regular, PlayfairDisplay_500Medium, PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold,
+		Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold,
+		Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
+		Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+		Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold,
+	});
+
+	if (!fontsLoaded) return null;
+
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<ThemeProvider>

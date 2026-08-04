@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import Text from '../theme/Text';
 import Slider from '@react-native-community/slider';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';

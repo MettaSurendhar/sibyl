@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import Text from '../../theme/Text';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
 import StreakLineChart from './StreakLineChart';
@@ -37,29 +38,6 @@ export default function GraphCarousel({
 
 	return (
 		<View style={styles.wrap}>
-			{/* Tab buttons */}
-			<View style={[styles.tabRow, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-				{TABS.map((tab) => {
-					const active = activeTab === tab.key;
-					return (
-						<TouchableOpacity
-							key={tab.key}
-							onPress={() => setActiveTab(tab.key)}
-							style={[
-								styles.tabBtn,
-								active && { backgroundColor: theme.surface, borderColor: theme.accent, borderWidth: 1 },
-							]}
-							activeOpacity={0.7}
-						>
-							<Feather name={tab.icon} size={18} color={active ? theme.accent : theme.textMuted} />
-							<Text style={[styles.tabLabel, { color: active ? theme.accent : theme.textMuted }]}>
-								{tab.label}
-							</Text>
-						</TouchableOpacity>
-					);
-				})}
-			</View>
-
 			{/* Chart content */}
 			<View style={[styles.chartContainer, { borderColor: theme.border }]}>
 				{activeTab === 'line' && (
@@ -106,6 +84,30 @@ export default function GraphCarousel({
 					/>
 				)}
 			</View>
+
+			{/* Tab buttons */}
+			<View style={styles.tabRow}>
+				{TABS.map((tab) => {
+					const active = activeTab === tab.key;
+					return (
+						<TouchableOpacity
+							key={tab.key}
+							onPress={() => setActiveTab(tab.key)}
+							style={[
+								styles.tabBtn,
+								{ 
+									backgroundColor: active ? theme.accent : theme.surfaceAlt, 
+									borderColor: active ? theme.accent : theme.border 
+								},
+							]}
+							activeOpacity={0.7}
+						>
+							<Feather name={tab.icon} size={20} color={active ? theme.bg : theme.textMuted} />
+						</TouchableOpacity>
+					);
+				})}
+			</View>
+
 		</View>
 	);
 }
@@ -114,20 +116,18 @@ const styles = StyleSheet.create({
 	wrap: { marginTop: 8, paddingHorizontal: PAGE_PADDING },
 	tabRow: {
 		flexDirection: 'row',
-		borderRadius: 14,
-		borderWidth: 1,
-		padding: 4,
-		marginBottom: 12,
-		gap: 4,
+		justifyContent: 'center',
+		marginTop: 16,
+		gap: 16,
 	},
 	tabBtn: {
-		flex: 1,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		alignItems: 'center',
-		paddingVertical: 10,
-		borderRadius: 10,
-		gap: 4,
+		justifyContent: 'center',
+		borderWidth: 1,
 	},
-	tabLabel: { fontSize: 11, fontWeight: '700' },
 	chartContainer: {
 		borderWidth: 1,
 		borderRadius: 16,

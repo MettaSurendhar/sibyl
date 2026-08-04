@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Text from '../../theme/Text';
 import { useTheme } from '../../theme/ThemeContext';
 
 export default function TagCountBoxes({ tags }) {

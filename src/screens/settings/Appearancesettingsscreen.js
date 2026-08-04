@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
 	View,
-	Text,
 	TouchableOpacity,
 	ScrollView,
 	StyleSheet,
 } from 'react-native';
+import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 import { themeList } from '../../theme/themes';
@@ -13,9 +13,6 @@ import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
 import { getPrefs, setPrefs } from '../../utils/settingsStore';
 
-// Small 3-color swatch pill (background / surface / accent) pulled straight from each theme's
-// existing palette - makes light themes (Paper/Slate/Sand) easier to tell apart at a glance
-// than a single accent dot did.
 function ThemeSwatch({ theme: t }) {
 	return (
 		<View style={styles.swatchPill}>
@@ -26,8 +23,16 @@ function ThemeSwatch({ theme: t }) {
 	);
 }
 
+const FONTS = [
+	{ key: 'playfair', label: 'Playfair Display', desc: 'Elegant Serif' },
+	{ key: 'lora', label: 'Lora', desc: 'Classic Serif' },
+	{ key: 'outfit', label: 'Outfit', desc: 'Modern Sans' },
+	{ key: 'inter', label: 'Inter', desc: 'Clean Sans' },
+	{ key: 'nunito', label: 'Nunito', desc: 'Friendly Rounded' },
+];
+
 export default function AppearanceSettingsScreen({ navigation }) {
-	const { theme, themeKey, setThemeKey } = useTheme();
+	const { theme, themeKey, setThemeKey, appFont, setAppFont } = useTheme();
 	const insets = useSafeAreaInsets();
 	const [streakDays, setStreakDays] = useState(14);
 
@@ -70,6 +75,27 @@ export default function AppearanceSettingsScreen({ navigation }) {
 						<Text style={{ color: theme.text, flex: 1, marginLeft: 12 }}>
 							{t.label}
 						</Text>
+					</TouchableOpacity>
+				))}
+			</SettingsSection>
+
+			<SettingsSection title='Typography'>
+				{FONTS.map((f) => (
+					<TouchableOpacity
+						key={f.key}
+						style={[
+							styles.optionRow,
+							{
+								borderColor: theme.border,
+								backgroundColor: appFont === f.key ? theme.surfaceAlt : 'transparent',
+							},
+						]}
+						onPress={() => setAppFont(f.key)}
+					>
+						<View style={{ flex: 1 }}>
+							<Text style={{ color: theme.text, fontSize: 16 }}>{f.label}</Text>
+							<Text style={{ color: theme.textMuted, fontSize: 12 }}>{f.desc}</Text>
+						</View>
 					</TouchableOpacity>
 				))}
 			</SettingsSection>

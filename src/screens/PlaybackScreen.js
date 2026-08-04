@@ -1,7 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
 	View,
-	Text,
 	TouchableOpacity,
 	Pressable,
 	StyleSheet,
@@ -9,6 +8,7 @@ import {
 	BackHandler,
 	useWindowDimensions,
 } from 'react-native';
+import Text from '../theme/Text';
 import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

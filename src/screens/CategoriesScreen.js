@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet, Modal } from 'react-native';
+import { View, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet, Modal } from 'react-native';
+import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';

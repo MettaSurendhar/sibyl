@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -84,7 +85,7 @@ export default function TodayScreen({ navigation }) {
 			{/* Header: Title + Settings icon */}
 			<View style={styles.headerRow}>
 				<Image
-					source={require('../../assets/icon.png')}
+					source={require('../../assets/header-icon.png')}
 					style={styles.headerIcon}
 					resizeMode="contain"
 				/>
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 20,
 		marginBottom: 18,
 	},
-	headerIcon: { width: 80, height: 32 },
+	headerIcon: { width: 180, height: 60, marginLeft: -16 },
 	settingsBtn: {
 		width: 36,
 		height: 36,
