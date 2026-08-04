@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
 	View,
 	Text,
-	TextInput,
 	TouchableOpacity,
 	StyleSheet,
 	Modal,
@@ -178,22 +177,6 @@ export default function TemplateChipEditor({
 					</TouchableOpacity>
 				))}
 			</View>
-
-			<TextInput
-				value={value}
-				onChangeText={onChange}
-				onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
-				style={[
-					styles.rawInput,
-					{
-						color: theme.text,
-						borderColor: theme.border,
-						backgroundColor: theme.surfaceAlt,
-					},
-				]}
-				placeholder='Or type directly…'
-				placeholderTextColor={theme.textMuted}
-			/>
 
 			<Modal
 				visible={!!pickerType}

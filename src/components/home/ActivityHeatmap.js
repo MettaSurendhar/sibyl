@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
+import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
 const GAP = 3;
 const ROWS = 7;
 const MIN_CELL = 9;
-const MAX_CELL = 20;
+const MAX_CELL = 16;
+const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const Y_LABEL_WIDTH = 14;
+const X_LABEL_HEIGHT = 16;
 
 function dateKeyLocal(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -14,25 +17,16 @@ function dateKeyLocal(d) {
 	).padStart(2, '0')}`;
 }
 
-// GitHub-style contribution grid: one column per week, one row per weekday, covering the
-// last `weeks` weeks. Color intensity (not hue) encodes how many recordings that day,
-// summed across every tag - deliberately kept to a handful of months (not full years) so it
-// fits on one screen without needing its own internal horizontal scroll, which would nest a
-// second horizontal-swipe surface inside the outer Home<->Library pager and the graph
-// carousel above it. See the phase plan's QA notes if you want to extend this to a
-// scrollable multi-year view later.
 export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 	const { theme } = useTheme();
 
-	// Cell size is derived from the given width (not a fixed constant) so the grid always
-	// fills the full available width regardless of how many weeks are shown, clamped to a
-	// sensible range so cells don't become illegibly tiny or comically large.
+	const availableWidth = width - Y_LABEL_WIDTH;
 	const cell = Math.max(
 		MIN_CELL,
-		Math.min(MAX_CELL, Math.floor((width - (weeks - 1) * GAP) / weeks)),
+		Math.min(MAX_CELL, Math.floor((availableWidth - (weeks - 1) * GAP) / weeks)),
 	);
 
-	const { cols, maxCount } = useMemo(() => {
+	const { cols, maxCount, monthLabels } = useMemo(() => {
 		const totalsByDay = {};
 		for (const row of dailyRows) {
 			totalsByDay[row.dateKey] = (totalsByDay[row.dateKey] || 0) + row.count;
@@ -43,8 +37,15 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 		const columns = [];
 		const cursor = new Date(start);
 		let max = 1;
+		const mLabels = [];
+		let lastMonth = -1;
 		for (let w = 0; w < weeks; w++) {
 			const days = [];
+			const colMonth = cursor.getMonth();
+			if (colMonth !== lastMonth) {
+				mLabels.push({ col: w, label: cursor.toLocaleDateString('en', { month: 'short' }) });
+				lastMonth = colMonth;
+			}
 			for (let d = 0; d < ROWS; d++) {
 				const key = dateKeyLocal(cursor);
 				const count = totalsByDay[key] || 0;
@@ -54,7 +55,7 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 			}
 			columns.push(days);
 		}
-		return { cols: columns, maxCount: max };
+		return { cols: columns, maxCount: max, monthLabels: mLabels };
 	}, [dailyRows, weeks]);
 
 	function withOpacity(hex, alpha) {
@@ -74,31 +75,94 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 	}
 
 	const gridWidth = weeks * cell + (weeks - 1) * GAP;
+	const gridHeight = ROWS * cell + (ROWS - 1) * GAP;
 
 	return (
-		<View style={styles.wrap}>
-			<Svg
-				width={gridWidth}
-				height={ROWS * cell + (ROWS - 1) * GAP}
-			>
-				{cols.map((days, colIndex) =>
-					days.map((count, rowIndex) => (
-						<Rect
-							key={`${colIndex}-${rowIndex}`}
-							x={colIndex * (cell + GAP)}
-							y={rowIndex * (cell + GAP)}
-							width={cell}
-							height={cell}
-							rx={2}
-							fill={colorFor(count)}
-						/>
-					)),
-				)}
-			</Svg>
+		<View>
+			{/* Month labels row */}
+			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH }]}>
+				{monthLabels.map(({ col, label }) => (
+					<Text
+						key={`m-${col}`}
+						style={[
+							styles.monthLabel,
+							{ color: theme.textMuted, left: col * (cell + GAP) },
+						]}
+					>
+						{label}
+					</Text>
+				))}
+			</View>
+
+			{/* Grid with Y labels */}
+			<View style={styles.gridRow}>
+				{/* Day-of-week labels */}
+				<View style={[styles.yLabels, { height: gridHeight }]}>
+					{DAY_LABELS.map((d, i) => (
+						<Text
+							key={i}
+							style={[
+								styles.dayLabel,
+								{
+									color: theme.textMuted,
+									height: cell,
+									lineHeight: cell,
+									marginBottom: i < ROWS - 1 ? GAP : 0,
+								},
+							]}
+						>
+							{d}
+						</Text>
+					))}
+				</View>
+
+				<Svg width={gridWidth} height={gridHeight}>
+					{cols.map((days, colIndex) =>
+						days.map((count, rowIndex) => (
+							<Rect
+								key={`${colIndex}-${rowIndex}`}
+								x={colIndex * (cell + GAP)}
+								y={rowIndex * (cell + GAP)}
+								width={cell}
+								height={cell}
+								rx={2}
+								fill={colorFor(count)}
+							/>
+						)),
+					)}
+				</Svg>
+			</View>
+
+			{/* Legend */}
+			<View style={styles.legend}>
+				<Text style={[styles.legendText, { color: theme.textMuted }]}>Less</Text>
+				{[0.15, 0.35, 0.6, 0.85, 1].map((alpha, i) => (
+					<View
+						key={i}
+						style={[
+							styles.legendCell,
+							{
+								backgroundColor:
+									i === 0 ? theme.border : withOpacity(theme.accent, alpha),
+								width: cell,
+								height: cell,
+							},
+						]}
+					/>
+				))}
+				<Text style={[styles.legendText, { color: theme.textMuted }]}>More</Text>
+			</View>
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	wrap: { alignItems: 'center' },
+	monthRow: { flexDirection: 'row', position: 'relative', height: X_LABEL_HEIGHT, marginBottom: 2 },
+	monthLabel: { position: 'absolute', fontSize: 9, fontWeight: '600' },
+	gridRow: { flexDirection: 'row' },
+	yLabels: { width: Y_LABEL_WIDTH, flexDirection: 'column' },
+	dayLabel: { fontSize: 9, textAlign: 'center' },
+	legend: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8, justifyContent: 'center' },
+	legendCell: { borderRadius: 2 },
+	legendText: { fontSize: 9, marginHorizontal: 4 },
 });

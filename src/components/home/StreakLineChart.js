@@ -1,10 +1,13 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Line, Polyline } from 'react-native-svg';
+import Svg, { Line, Polyline, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
 const CHART_HEIGHT = 180;
-const PADDING = 20;
+const PADDING_LEFT = 32; // space for Y-axis labels
+const PADDING_RIGHT = 10;
+const PADDING_TOP = 10;
+const PADDING_BOTTOM = 28; // space for X-axis labels
 
 function dateKeyLocal(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -12,14 +15,15 @@ function dateKeyLocal(d) {
 	).padStart(2, '0')}`;
 }
 
-// Daily entry counts per tag over the last `days` days, plus one "overall" dashed line
-// summing every tag that day. This shows day-to-day consistency per tag rather than the
-// single monotonic streak number, which would just be a flat step function and wouldn't be
-// very informative as a chart.
+function shortDay(dateKey) {
+	const d = new Date(dateKey + 'T00:00:00');
+	return d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 2);
+}
+
 export default function StreakLineChart({ tags, dailyRows, days, width }) {
 	const { theme } = useTheme();
 
-	const { seriesByTag, overallSeries, maxValue } = useMemo(() => {
+	const { seriesByTag, overallSeries, maxValue, dateKeys } = useMemo(() => {
 		const keys = [];
 		const now = new Date();
 		for (let i = days - 1; i >= 0; i--) {
@@ -50,37 +54,78 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 			seriesByTag: seriesByTagLocal,
 			overallSeries: overall,
 			maxValue: max,
+			dateKeys: keys,
 		};
 	}, [tags, dailyRows, days]);
 
-	const plotWidth = width - PADDING * 2;
-	const plotHeight = CHART_HEIGHT - PADDING * 2;
+	const plotWidth = width - PADDING_LEFT - PADDING_RIGHT;
+	const plotHeight = CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 	const stepX = plotWidth / Math.max(1, days - 1);
 
 	function pointsFor(values) {
 		return values
 			.map((v, i) => {
-				const x = PADDING + i * stepX;
-				const y = PADDING + plotHeight - (v / maxValue) * plotHeight;
+				const x = PADDING_LEFT + i * stepX;
+				const y = PADDING_TOP + plotHeight - (v / maxValue) * plotHeight;
 				return `${x},${y}`;
 			})
 			.join(' ');
 	}
 
+	// Y-axis ticks: 0, mid, max
+	const yTicks = [0, Math.round(maxValue / 2), maxValue];
+	// X-axis ticks: show every ~3 days to avoid crowding
+	const xTickEvery = Math.max(1, Math.floor(days / 5));
+
 	return (
 		<View>
-			<Svg
-				width={width}
-				height={CHART_HEIGHT}
-			>
-				<Line
-					x1={PADDING}
-					y1={PADDING + plotHeight}
-					x2={width - PADDING}
-					y2={PADDING + plotHeight}
-					stroke={theme.border}
-					strokeWidth={1}
-				/>
+			<Svg width={width} height={CHART_HEIGHT}>
+				{/* Y gridlines and labels */}
+				{yTicks.map((val) => {
+					const y = PADDING_TOP + plotHeight - (val / maxValue) * plotHeight;
+					return (
+						<React.Fragment key={`y-${val}`}>
+							<Line
+								x1={PADDING_LEFT}
+								y1={y}
+								x2={PADDING_LEFT + plotWidth}
+								y2={y}
+								stroke={theme.border}
+								strokeWidth={0.8}
+								strokeDasharray={val === 0 ? undefined : '3,3'}
+							/>
+							<SvgText
+								x={PADDING_LEFT - 4}
+								y={y + 4}
+								fontSize={9}
+								fill={theme.textMuted}
+								textAnchor='end'
+							>
+								{val}
+							</SvgText>
+						</React.Fragment>
+					);
+				})}
+
+				{/* X-axis labels */}
+				{dateKeys.map((key, i) => {
+					if (i % xTickEvery !== 0 && i !== days - 1) return null;
+					const x = PADDING_LEFT + i * stepX;
+					return (
+						<SvgText
+							key={`x-${i}`}
+							x={x}
+							y={CHART_HEIGHT - 4}
+							fontSize={9}
+							fill={theme.textMuted}
+							textAnchor='middle'
+						>
+							{shortDay(key)}
+						</SvgText>
+					);
+				})}
+
+				{/* Data lines */}
 				{seriesByTag.map(({ tag, values }) => (
 					<Polyline
 						key={tag.id ?? 'untagged'}
@@ -102,26 +147,20 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 					strokeLinecap='round'
 				/>
 			</Svg>
+
+			{/* Legend */}
 			<View style={styles.legend}>
 				{tags.map((tag) => (
-					<View
-						key={tag.id ?? 'untagged'}
-						style={styles.legendItem}
-					>
+					<View key={tag.id ?? 'untagged'} style={styles.legendItem}>
 						<View style={[styles.legendDot, { backgroundColor: tag.color }]} />
-						<Text
-							style={[styles.legendText, { color: theme.textMuted }]}
-							numberOfLines={1}
-						>
+						<Text style={[styles.legendText, { color: theme.textMuted }]} numberOfLines={1}>
 							{tag.name}
 						</Text>
 					</View>
 				))}
 				<View style={styles.legendItem}>
 					<View style={[styles.legendDot, { backgroundColor: theme.text }]} />
-					<Text style={[styles.legendText, { color: theme.textMuted }]}>
-						Overall
-					</Text>
+					<Text style={[styles.legendText, { color: theme.textMuted }]}>Overall</Text>
 				</View>
 			</View>
 		</View>
@@ -129,7 +168,7 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 }
 
 const styles = StyleSheet.create({
-	legend: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 10 },
+	legend: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 10 },
 	legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: 4 },
 	legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
 	legendText: { fontSize: 11 },

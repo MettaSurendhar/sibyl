@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,12 +11,31 @@ import GraphCarousel from '../components/home/GraphCarousel';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LINE_CHART_DAYS = 14;
-const HEATMAP_WEEKS = 20; // ~4-5 months; kept screen-width-sized, see ActivityHeatmap comment
+const HEATMAP_WEEKS = 20;
 
-// Home dashboard: tag count boxes up top, three swipeable graphs below (streak line, pie,
-// activity heatmap). Replaces the old "Still up? / streak pill / recent entries" layout per
-// the phase plan - the overall streak still gets a small mention, just folded into the
-// header instead of being the whole screen's identity.
+function dateKeyLocal(d) {
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+		d.getDate(),
+	).padStart(2, '0')}`;
+}
+
+// Computes last N days as {date, hasRecording} for the streak tracker row.
+function buildStreakDays(dailyRows, count) {
+	const totalsByDay = {};
+	for (const row of dailyRows) {
+		totalsByDay[row.dateKey] = (totalsByDay[row.dateKey] || 0) + row.count;
+	}
+	const result = [];
+	const now = new Date();
+	for (let i = count - 1; i >= 0; i--) {
+		const d = new Date(now);
+		d.setDate(d.getDate() - i);
+		const key = dateKeyLocal(d);
+		result.push({ key, hasRecording: (totalsByDay[key] || 0) > 0 });
+	}
+	return result;
+}
+
 export default function TodayScreen({ navigation }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
@@ -47,6 +66,8 @@ export default function TodayScreen({ navigation }) {
 		}, [refresh]),
 	);
 
+	const streakDays = buildStreakDays(dailyRows, 14);
+
 	return (
 		<ScrollView
 			style={[styles.container, { backgroundColor: theme.bg }]}
@@ -56,27 +77,61 @@ export default function TodayScreen({ navigation }) {
 			}}
 			showsVerticalScrollIndicator={false}
 		>
+			{/* Header: Title + Settings icon */}
 			<View style={styles.headerRow}>
 				<Text style={[styles.title, { color: theme.text }]}>Home</Text>
-				{overallStreak > 0 && (
-					<View
-						style={[styles.streakPill, { backgroundColor: theme.surfaceAlt }]}
-					>
-						<Feather
-							name='zap'
-							size={13}
-							color={theme.accent}
-							style={{ marginRight: 4 }}
-						/>
-						<Text style={[styles.streakText, { color: theme.text }]}>
-							{overallStreak}-day overall streak
-						</Text>
-					</View>
-				)}
+				<TouchableOpacity
+					onPress={() => navigation.navigate('Settings')}
+					style={[styles.settingsBtn, { backgroundColor: theme.surfaceAlt }]}
+					hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+				>
+					<Feather name='settings' size={18} color={theme.textMuted} />
+				</TouchableOpacity>
 			</View>
 
+			{/* Tag count boxes */}
 			<TagCountBoxes tags={tagCounts} />
 
+			{/* Streak tracker widget */}
+			<View style={[styles.streakCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+				<View style={styles.streakHeader}>
+					<View style={styles.streakTitleRow}>
+						<Feather name='zap' size={15} color={theme.accent} style={{ marginRight: 5 }} />
+						<Text style={[styles.streakTitle, { color: theme.text }]}>
+							{overallStreak > 0 ? `${overallStreak}-day streak` : 'No streak yet'}
+						</Text>
+					</View>
+					<Text style={[styles.streakSub, { color: theme.textMuted }]}>last 14 days</Text>
+				</View>
+				<View style={styles.streakDots}>
+					{streakDays.map((day, i) => (
+						<View
+							key={day.key}
+							style={[
+								styles.streakDot,
+								{
+									backgroundColor: day.hasRecording
+										? theme.accent
+										: theme.border,
+									opacity: day.hasRecording ? 1 : 0.5,
+								},
+							]}
+						/>
+					))}
+				</View>
+				<View style={styles.streakFooter}>
+					<View style={styles.streakLegendItem}>
+						<View style={[styles.streakLegendDot, { backgroundColor: theme.accent }]} />
+						<Text style={[styles.streakLegendText, { color: theme.textMuted }]}>Recorded</Text>
+					</View>
+					<View style={styles.streakLegendItem}>
+						<View style={[styles.streakLegendDot, { backgroundColor: theme.border, opacity: 0.5 }]} />
+						<Text style={[styles.streakLegendText, { color: theme.textMuted }]}>Missed</Text>
+					</View>
+				</View>
+			</View>
+
+			{/* Graphs */}
 			<GraphCarousel
 				tags={tagCounts}
 				dailyRows={dailyRows}
@@ -98,12 +153,46 @@ const styles = StyleSheet.create({
 		marginBottom: 18,
 	},
 	title: { fontSize: 24, fontWeight: '700' },
-	streakPill: {
+	settingsBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	// Streak card
+	streakCard: {
+		marginHorizontal: 16,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderRadius: 16,
+		padding: 14,
+	},
+	streakHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 5,
-		paddingHorizontal: 10,
-		borderRadius: 14,
+		justifyContent: 'space-between',
+		marginBottom: 12,
 	},
-	streakText: { fontSize: 12, fontWeight: '700' },
+	streakTitleRow: { flexDirection: 'row', alignItems: 'center' },
+	streakTitle: { fontSize: 14, fontWeight: '700' },
+	streakSub: { fontSize: 11 },
+	streakDots: {
+		flexDirection: 'row',
+		gap: 5,
+		flexWrap: 'wrap',
+	},
+	streakDot: {
+		width: 14,
+		height: 14,
+		borderRadius: 7,
+	},
+	streakFooter: {
+		flexDirection: 'row',
+		gap: 16,
+		marginTop: 10,
+	},
+	streakLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+	streakLegendDot: { width: 8, height: 8, borderRadius: 4 },
+	streakLegendText: { fontSize: 11 },
 });
