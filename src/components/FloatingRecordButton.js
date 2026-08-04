@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
 	useSharedValue,
@@ -64,9 +64,10 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 	};
 	const clampY = (y) => {
 		'worklet';
+		// Allow dragging all the way to the bottom safe-area edge (not restricted by bottomOffset)
 		return Math.max(
 			insets.top + MARGIN,
-			Math.min(screenH - BUTTON_SIZE - MARGIN - bottomOffset, y),
+			Math.min(screenH - BUTTON_SIZE - MARGIN - insets.bottom, y),
 		);
 	};
 
@@ -122,32 +123,50 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 
 	return (
 		<GestureDetector gesture={composed}>
-			<Animated.View
-				style={[styles.fab, { backgroundColor: theme.accent }, animatedStyle]}
-			>
-				<Feather
-					name='mic'
-					size={26}
-					color='#fff'
-				/>
+			<Animated.View style={[styles.container, animatedStyle]}>
+				{/* Halo ring to lift it off the dark background */}
+				<View style={[styles.halo, { borderColor: theme.accent }]} />
+				
+				{/* The actual button */}
+				<View style={[styles.fab, { backgroundColor: theme.accent }]}>
+					<Feather
+						name='mic'
+						size={26}
+						color='#fff'
+					/>
+				</View>
 			</Animated.View>
 		</GestureDetector>
 	);
 }
 
 const styles = StyleSheet.create({
-	fab: {
+	container: {
 		position: 'absolute',
+		width: BUTTON_SIZE,
+		height: BUTTON_SIZE,
+		zIndex: 20,
+	},
+	halo: {
+		position: 'absolute',
+		top: -8,
+		left: -8,
+		width: BUTTON_SIZE + 16,
+		height: BUTTON_SIZE + 16,
+		borderRadius: (BUTTON_SIZE + 16) / 2,
+		backgroundColor: 'rgba(0,0,0,0.3)',
+		borderWidth: 1,
+		opacity: 0.3,
+	},
+	fab: {
 		width: BUTTON_SIZE,
 		height: BUTTON_SIZE,
 		borderRadius: BUTTON_SIZE / 2,
 		alignItems: 'center',
 		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.4,
-		shadowRadius: 10,
+		// Subtle inner rim to make the button itself look 3D and premium
+		borderWidth: 2,
+		borderColor: 'rgba(255,255,255,0.2)',
 		elevation: 10,
-		zIndex: 20,
 	},
 });
