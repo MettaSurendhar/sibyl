@@ -16,15 +16,25 @@ const TABS = [
 	{ key: 'heatmap', label: 'Heatmap', icon: 'calendar' },
 ];
 
+const TIME_OPTIONS = [
+	{ label: '7D', value: 7 },
+	{ label: '14D', value: 14 },
+	{ label: '30D', value: 30 },
+	{ label: '3M', value: 90 },
+	{ label: '6M', value: 180 },
+	{ label: '1Y', value: 365 },
+];
+
 export default function GraphCarousel({
 	tags,
 	dailyRows,
 	pieSlices,
-	lineChartDays,
+	pieSlices,
 	heatmapWeeks,
 }) {
 	const { theme } = useTheme();
 	const [activeTab, setActiveTab] = useState('line');
+	const [lineDays, setLineDays] = useState(14);
 
 	return (
 		<View style={styles.wrap}>
@@ -54,12 +64,35 @@ export default function GraphCarousel({
 			{/* Chart content */}
 			<View style={[styles.chartContainer, { borderColor: theme.border }]}>
 				{activeTab === 'line' && (
-					<StreakLineChart
-						tags={tags}
-						dailyRows={dailyRows}
-						days={lineChartDays}
-						width={CHART_WIDTH}
-					/>
+					<>
+						<View style={styles.timeSelectorRow}>
+							{TIME_OPTIONS.map((opt) => (
+								<TouchableOpacity
+									key={opt.value}
+									onPress={() => setLineDays(opt.value)}
+									style={[
+										styles.timeBtn,
+										lineDays === opt.value && { backgroundColor: theme.surfaceAlt },
+									]}
+								>
+									<Text
+										style={[
+											styles.timeBtnText,
+											{ color: lineDays === opt.value ? theme.accent : theme.textMuted },
+										]}
+									>
+										{opt.label}
+									</Text>
+								</TouchableOpacity>
+							))}
+						</View>
+						<StreakLineChart
+							tags={tags}
+							dailyRows={dailyRows}
+							days={lineDays}
+							width={CHART_WIDTH}
+						/>
+					</>
 				)}
 				{activeTab === 'pie' && (
 					<TagPieChart
@@ -102,5 +135,20 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		padding: 14,
 		paddingTop: 16,
+	},
+	timeSelectorRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		marginBottom: 16,
+		paddingHorizontal: 4,
+	},
+	timeBtn: {
+		paddingVertical: 4,
+		paddingHorizontal: 8,
+		borderRadius: 8,
+	},
+	timeBtnText: {
+		fontSize: 11,
+		fontWeight: '700',
 	},
 });

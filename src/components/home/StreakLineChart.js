@@ -5,8 +5,8 @@ import { useTheme } from '../../theme/ThemeContext';
 
 const CHART_HEIGHT = 180;
 const PADDING_LEFT = 32; // space for Y-axis labels
-const PADDING_RIGHT = 10;
-const PADDING_TOP = 10;
+const PADDING_RIGHT = 15;
+const PADDING_TOP = 20;
 const PADDING_BOTTOM = 28; // space for X-axis labels
 
 function dateKeyLocal(d) {
@@ -15,8 +15,11 @@ function dateKeyLocal(d) {
 	).padStart(2, '0')}`;
 }
 
-function shortDay(dateKey) {
+function formatXLabel(dateKey, totalDays) {
 	const d = new Date(dateKey + 'T00:00:00');
+	if (totalDays > 31) {
+		return d.toLocaleDateString('en', { month: 'short' });
+	}
 	return d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 2);
 }
 
@@ -120,7 +123,7 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 							fill={theme.textMuted}
 							textAnchor='middle'
 						>
-							{shortDay(key)}
+							{formatXLabel(key, days)}
 						</SvgText>
 					);
 				})}

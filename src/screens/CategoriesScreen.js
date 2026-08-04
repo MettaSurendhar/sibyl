@@ -138,11 +138,11 @@ export default function CategoriesScreen({ navigation }) {
                 Next name: {renderTemplate(item.nameTemplate || '{tag} <count>', { tag: item.name, count: (counts[item.id] || 0) + 1 })}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => openEdit(item)} style={styles.catAction}>
-              <Feather name="edit-2" size={17} color={theme.text} />
+            <TouchableOpacity onPress={() => openEdit(item)} style={[styles.catAction, { backgroundColor: theme.surfaceAlt }]}>
+              <Feather name="edit-2" size={16} color={theme.text} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDelete(item)} style={styles.catAction}>
-              <Feather name="trash-2" size={17} color="#E5605A" />
+            <TouchableOpacity onPress={() => handleDelete(item)} style={[styles.catAction, { backgroundColor: theme.surfaceAlt }]}>
+              <Feather name="trash-2" size={16} color="#E5605A" />
             </TouchableOpacity>
           </View>
         )}
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   addBtn: { width: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   catRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
   swatch: { width: 14, height: 14, borderRadius: 7, marginRight: 12 },
-  catAction: { marginLeft: 14 },
+  catAction: { marginLeft: 10, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   editCard: { width: '88%', maxHeight: '80%', borderRadius: 16, padding: 20 },
   editTitle: { fontSize: 17, fontWeight: '700', marginBottom: 16 },

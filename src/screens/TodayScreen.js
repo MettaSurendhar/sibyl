@@ -13,6 +13,7 @@ import GraphCarousel from '../components/home/GraphCarousel';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LINE_CHART_DAYS = 14;
 const HEATMAP_WEEKS = 20;
+const MAX_FETCH_DAYS = 365;
 
 function dateKeyLocal(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -47,11 +48,11 @@ export default function TodayScreen({ navigation }) {
 
 	const refresh = useCallback(() => {
 		const now = Date.now();
-		const heatmapFrom = now - HEATMAP_WEEKS * 7 * DAY_MS;
+		const fetchFrom = now - MAX_FETCH_DAYS * DAY_MS;
 		Promise.all([
 			getAllTagCounts(),
 			getStreakCount(),
-			getDailyEntryCounts({ from: heatmapFrom, to: now }),
+			getDailyEntryCounts({ from: fetchFrom, to: now }),
 			getPieBreakdown(),
 			getPrefs(),
 		]).then(([tags, streak, daily, pie, prefs]) => {
@@ -137,7 +138,6 @@ export default function TodayScreen({ navigation }) {
 				tags={tagCounts}
 				dailyRows={dailyRows}
 				pieSlices={pieSlices}
-				lineChartDays={LINE_CHART_DAYS}
 				heatmapWeeks={HEATMAP_WEEKS}
 			/>
 		</ScrollView>
@@ -177,9 +177,9 @@ const styles = StyleSheet.create({
 	streakTitleRow: { flexDirection: 'row', alignItems: 'center' },
 	streakTitle: { fontSize: 14, fontWeight: '700' },
 	streakSub: { fontSize: 11 },
-	streakDots: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+	streakDots: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
 	streakDot: { width: 14, height: 14, borderRadius: 7 },
-	streakFooter: { flexDirection: 'row', gap: 16, marginTop: 10 },
+	streakFooter: { flexDirection: 'row', gap: 16, marginTop: 12, justifyContent: 'center' },
 	streakLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 	streakLegendDot: { width: 8, height: 8, borderRadius: 4 },
 	streakLegendText: { fontSize: 11 },

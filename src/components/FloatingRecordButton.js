@@ -35,9 +35,9 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 
 	const translateX = useSharedValue(defaultX);
 	const translateY = useSharedValue(defaultY);
-	const startX = useSharedValue(defaultX);
 	const startY = useSharedValue(defaultY);
 	const isDragging = useSharedValue(false);
+	const scale = useSharedValue(1);
 
 	// Restore any remembered position once on mount.
 	useEffect(() => {
@@ -75,7 +75,13 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 			isDragging.value = true;
 			startX.value = translateX.value;
 			startY.value = translateY.value;
+			scale.value = withSpring(1.15, { damping: 10, stiffness: 200 });
 			runOnJS(hapticStart)();
+		})
+		.onEnd(() => {
+			if (!isDragging.value) {
+				scale.value = withSpring(1);
+			}
 		});
 
 	const pan = Gesture.Pan()
@@ -90,6 +96,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 			const clampedY = clampY(translateY.value);
 			translateX.value = withSpring(clampedX);
 			translateY.value = withSpring(clampedY);
+			scale.value = withSpring(1);
 			isDragging.value = false;
 			runOnJS(persistPosition)(clampedX, clampedY);
 		});
@@ -108,6 +115,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 		transform: [
 			{ translateX: translateX.value },
 			{ translateY: translateY.value },
+			{ scale: scale.value },
 		],
 	}));
 
@@ -135,10 +143,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 6,
-		elevation: 6,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.4,
+		shadowRadius: 10,
+		elevation: 10,
 		zIndex: 20,
 	},
 });

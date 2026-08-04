@@ -43,7 +43,7 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 			const days = [];
 			const colMonth = cursor.getMonth();
 			if (colMonth !== lastMonth) {
-				mLabels.push({ col: w, label: cursor.toLocaleDateString('en', { month: 'short' }) });
+				mLabels.push({ col: w, label: cursor.toLocaleDateString('en', { month: 'short', year: 'numeric' }) });
 				lastMonth = colMonth;
 			}
 			for (let d = 0; d < ROWS; d++) {
@@ -81,17 +81,19 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 		<View>
 			{/* Month labels row */}
 			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH }]}>
-				{monthLabels.map(({ col, label }) => (
-					<Text
-						key={`m-${col}`}
-						style={[
-							styles.monthLabel,
-							{ color: theme.textMuted, left: col * (cell + GAP) },
-						]}
-					>
-						{label}
-					</Text>
-				))}
+				{monthLabels.map(({ col, label }, i) =>
+					i % 2 === 0 ? (
+						<Text
+							key={`m-${col}`}
+							style={[
+								styles.monthLabel,
+								{ color: theme.textMuted, left: col * (cell + GAP) },
+							]}
+						>
+							{label}
+						</Text>
+					) : null,
+				)}
 			</View>
 
 			{/* Grid with Y labels */}
@@ -151,6 +153,23 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 					/>
 				))}
 				<Text style={[styles.legendText, { color: theme.textMuted }]}>More</Text>
+			</View>
+
+			{/* Month labels bottom */}
+			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH, marginTop: 4, marginBottom: 0 }]}>
+				{monthLabels.map(({ col, label }, i) =>
+					i % 2 === 1 ? (
+						<Text
+							key={`m-${col}`}
+							style={[
+								styles.monthLabel,
+								{ color: theme.textMuted, left: col * (cell + GAP) },
+							]}
+						>
+							{label}
+						</Text>
+					) : null,
+				)}
 			</View>
 		</View>
 	);
