@@ -24,8 +24,9 @@ function ThemeSwatch({ theme: t }) {
 }
 
 const FONTS = [
-	{ key: 'playfair', label: 'Playfair Display', desc: 'Elegant Serif' },
+	{ key: 'system', label: 'System Default', desc: 'Device Default Font' },
 	{ key: 'lora', label: 'Lora', desc: 'Classic Serif' },
+	{ key: 'playfair', label: 'Playfair Display', desc: 'Elegant Serif' },
 	{ key: 'outfit', label: 'Outfit', desc: 'Modern Sans' },
 	{ key: 'inter', label: 'Inter', desc: 'Clean Sans' },
 	{ key: 'nunito', label: 'Nunito', desc: 'Friendly Rounded' },

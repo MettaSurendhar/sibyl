@@ -78,7 +78,7 @@ export default function TodayScreen({ navigation }) {
 			style={[styles.container, { backgroundColor: theme.bg }]}
 			contentContainerStyle={{
 				paddingTop: insets.top + 20,
-				paddingBottom: insets.bottom + 80,
+				paddingBottom: insets.bottom + 16,
 			}}
 			showsVerticalScrollIndicator={false}
 		>

@@ -26,7 +26,8 @@ const FONT_MAP = {
 };
 
 function getFontFamily(appFont, weight) {
-	const map = FONT_MAP[appFont] || FONT_MAP.playfair;
+	if (appFont === 'system') return null;
+	const map = FONT_MAP[appFont] || FONT_MAP.lora;
 	const isBold = weight === 'bold' || weight === '700' || weight === '800' || weight === '900' || weight === '600';
 	return isBold ? map.bold : map.normal;
 }
@@ -54,7 +55,8 @@ export default function Text(props) {
 		<RNText 
 			{...props} 
 			style={[
-				{ color: theme.text, fontFamily: family },
+				{ color: theme.text },
+				family ? { fontFamily: family } : { fontWeight: passedWeight !== 'normal' ? passedWeight : undefined },
 				cleanedStyle,
 			]}
 		/>

@@ -25,7 +25,7 @@ const DEFAULT_PREFS = {
 	// Number of days shown in the streak tracker on the Home dashboard (7, 14, or 30).
 	streakDays: 14,
 	// Global app font family
-	appFont: 'playfair',
+	appFont: 'lora',
 };
 
 export async function getPrefs() {

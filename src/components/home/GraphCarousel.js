@@ -9,7 +9,8 @@ import ActivityHeatmap from './ActivityHeatmap';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGE_PADDING = 16;
-const CHART_WIDTH = SCREEN_WIDTH - PAGE_PADDING * 2;
+const CONTAINER_PADDING = 14;
+const CHART_WIDTH = SCREEN_WIDTH - (PAGE_PADDING * 2) - (CONTAINER_PADDING * 2);
 
 const TABS = [
 	{ key: 'line', label: 'Activity', icon: 'trending-up' },

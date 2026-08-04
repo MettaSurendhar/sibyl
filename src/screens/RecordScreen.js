@@ -259,7 +259,7 @@ export default function RecordScreen({ navigation }) {
 					{status !== 'idle' && <WaveformRuler sampleCount={samples.length} />}
 					<LiveWaveform
 						samples={samples}
-						color={theme.waveform}
+						color={status === 'recording' ? (theme.waveformRecording || theme.accent) : theme.waveform}
 					/>
 				</View>
 

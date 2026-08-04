@@ -9,13 +9,13 @@ const ThemeContext = createContext({
   theme: themes[DEFAULT_THEME_KEY],
   themeKey: DEFAULT_THEME_KEY,
   setThemeKey: () => {},
-  appFont: 'playfair',
+  appFont: 'lora',
   setAppFont: () => {},
 });
 
 export function ThemeProvider({ children }) {
   const [themeKey, setThemeKeyState] = useState(DEFAULT_THEME_KEY);
-  const [appFont, setAppFontState] = useState('playfair');
+  const [appFont, setAppFontState] = useState('lora');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {

@@ -1,18 +1,38 @@
 export const themes = {
-  // Default theme - dark green + gold, refined from the icon artwork's navy/gold/teal palette.
-  // The accent gold here is intentionally deeper/more saturated than the icon's pale linework
-  // gold: that pale tone (#E9D09E) reads fine as thin decorative linework on navy, but used as a
-  // solid button fill with white icons/text on top, it didn't have enough contrast - white was
-  // "missing its color" against it. This deeper gold fixes that while staying warm/gold in feel.
+  // Sibyl theme — extracted from splash screen artwork + accessible text hierarchy.
   sibyl: {
     key: 'sibyl',
-    label: 'Sibyl (Dark)',
+    label: 'Sibyl',
+    isDark: true,
+    bg: '#0C1525',           // deep navy — splash background
+    surface: '#132038',      // slightly lighter navy for cards/sheets
+    surfaceAlt: '#1A2E50',   // mid-navy for selected/hover surfaces
+    border: '#243D60',       // subtle blue-navy border
+    text: '#F0F4FF',         // bright white-blue — primary readable text
+    textSecondary: '#C8DAEE',// soft blue-white — for labels, subtitles
+    textMuted: '#7A99BB',    // desaturated blue-grey for secondary/muted text
+    accent: '#C9A458',       // rich gold — the logo ring & lettering gold
+    accentDeep: '#A07C30',   // deeper gold for pressed states
+    teal: '#2ABCCE',         // cerulean teal — the hair highlight color
+    tealDeep: '#1A8A9A',     // deeper teal for secondary teal elements
+    danger: '#E07070',       // muted red for destructive actions
+    success: '#5DC4A8',      // teal-green for success states
+    waveform: '#2ABCCE',     // teal when idle
+    waveformRecording: '#C9A458', // gold when actively recording
+    waveformMuted: '#1A2E50',// muted waveform bg
+  },
+
+  // The original dark-green Sibyl palette, kept for those who prefer it.
+  sibylClassic: {
+    key: 'sibylClassic',
+    label: 'Sibyl Classic',
     isDark: true,
     bg: '#0D1B14',
     surface: '#142A1F',
     surfaceAlt: '#1C3B2A',
     border: '#2A4A38',
     text: '#F3ECDC',
+    textSecondary: '#D8CEBC',
     textMuted: '#8FA895',
     accent: '#C9973F',
     accentDeep: '#A67C2E',
@@ -21,6 +41,7 @@ export const themes = {
     danger: '#E38585',
     success: '#6FC2A6',
     waveform: '#3FAE8A',
+    waveformRecording: '#C9973F',
     waveformMuted: '#33443C',
   },
   midnight: {
