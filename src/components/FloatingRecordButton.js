@@ -35,6 +35,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 
 	const translateX = useSharedValue(defaultX);
 	const translateY = useSharedValue(defaultY);
+	const startX = useSharedValue(defaultX);
 	const startY = useSharedValue(defaultY);
 	const isDragging = useSharedValue(false);
 	const scale = useSharedValue(1);

@@ -29,7 +29,6 @@ export default function GraphCarousel({
 	tags,
 	dailyRows,
 	pieSlices,
-	pieSlices,
 	heatmapWeeks,
 }) {
 	const { theme } = useTheme();
