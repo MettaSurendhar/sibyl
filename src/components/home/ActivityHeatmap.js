@@ -43,7 +43,7 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 			const days = [];
 			const colMonth = cursor.getMonth();
 			if (colMonth !== lastMonth) {
-				mLabels.push({ col: w, label: cursor.toLocaleDateString('en', { month: 'short', year: 'numeric' }) });
+				mLabels.push({ col: w, monthIndex: colMonth, label: cursor.toLocaleDateString('en', { month: 'short' }) });
 				lastMonth = colMonth;
 			}
 			for (let d = 0; d < ROWS; d++) {
@@ -81,8 +81,8 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 		<View>
 			{/* Month labels row */}
 			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH }]}>
-				{monthLabels.map(({ col, label }, i) =>
-					i % 2 === 0 ? (
+				{monthLabels.map(({ col, monthIndex, label }) =>
+					monthIndex % 2 === 0 ? (
 						<Text
 							key={`m-${col}`}
 							style={[
@@ -157,8 +157,8 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 
 			{/* Month labels bottom */}
 			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH, marginTop: 4, marginBottom: 0 }]}>
-				{monthLabels.map(({ col, label }, i) =>
-					i % 2 === 1 ? (
+				{monthLabels.map(({ col, monthIndex, label }) =>
+					monthIndex % 2 === 1 ? (
 						<Text
 							key={`m-${col}`}
 							style={[
@@ -171,6 +171,10 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 					) : null,
 				)}
 			</View>
+
+			<Text style={[styles.yearLabel, { color: theme.textMuted }]}>
+				{new Date().getFullYear()}
+			</Text>
 		</View>
 	);
 }
@@ -184,4 +188,5 @@ const styles = StyleSheet.create({
 	legend: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8, justifyContent: 'center' },
 	legendCell: { borderRadius: 2 },
 	legendText: { fontSize: 9, marginHorizontal: 4 },
+	yearLabel: { textAlign: 'center', fontSize: 10, marginTop: 8, fontWeight: '600' },
 });

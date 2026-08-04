@@ -17,10 +17,13 @@ function dateKeyLocal(d) {
 
 function formatXLabel(dateKey, totalDays) {
 	const d = new Date(dateKey + 'T00:00:00');
-	if (totalDays > 31) {
-		return d.toLocaleDateString('en', { month: 'short' });
+	if (totalDays <= 7) {
+		return d.toLocaleDateString('en', { weekday: 'short' });
 	}
-	return d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 2);
+	if (totalDays <= 31) {
+		return d.toLocaleDateString('en', { day: '2-digit' });
+	}
+	return d.toLocaleDateString('en', { month: 'short' });
 }
 
 export default function StreakLineChart({ tags, dailyRows, days, width }) {
@@ -112,7 +115,16 @@ export default function StreakLineChart({ tags, dailyRows, days, width }) {
 
 				{/* X-axis labels */}
 				{dateKeys.map((key, i) => {
-					if (i % xTickEvery !== 0 && i !== days - 1) return null;
+					let showTick = false;
+					if (days <= 31) {
+						showTick = (i % xTickEvery === 0) || (i === days - 1);
+					} else {
+						// For >31 days, show tick on the 1st of each month or the last day
+						const d = new Date(key + 'T00:00:00');
+						showTick = d.getDate() === 1 || i === days - 1;
+					}
+					if (!showTick) return null;
+					
 					const x = PADDING_LEFT + i * stepX;
 					return (
 						<SvgText
