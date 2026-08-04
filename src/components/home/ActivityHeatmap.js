@@ -1,15 +1,18 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 
-const GAP = 3;
-const ROWS = 7;
-const MIN_CELL = 9;
-const MAX_CELL = 16;
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const GAP = 2;
+const ROWS = 7; // Sun=0 … Sat=6
+const CELL = 11;
 const Y_LABEL_WIDTH = 14;
-const X_LABEL_HEIGHT = 16;
+const LABEL_ROW_H = 16;
+
+// Jan=0, Feb=1, ..., Nov=10, Dec=11
+// TOP  → even monthIndex (Jan, Mar, May, Jul, Sep, Nov)
+// BOTTOM → odd  monthIndex (Feb, Apr, Jun, Aug, Oct, Dec)
+const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function dateKeyLocal(d) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -17,36 +20,37 @@ function dateKeyLocal(d) {
 	).padStart(2, '0')}`;
 }
 
-export default function ActivityHeatmap({ dailyRows, weeks, width }) {
+export default function ActivityHeatmap({ dailyRows, weeks }) {
 	const { theme } = useTheme();
 
-	const availableWidth = width - Y_LABEL_WIDTH;
-	const cell = Math.max(
-		MIN_CELL,
-		Math.min(MAX_CELL, Math.floor((availableWidth - (weeks - 1) * GAP) / weeks)),
-	);
-
-	const { cols, maxCount, monthLabels } = useMemo(() => {
+	const { cols, maxCount, topLabels, bottomLabels, year } = useMemo(() => {
 		const totalsByDay = {};
 		for (const row of dailyRows) {
 			totalsByDay[row.dateKey] = (totalsByDay[row.dateKey] || 0) + row.count;
 		}
+
+		// Start on the Sunday that is >= (weeks * 7) days ago so columns always start on Sunday
 		const today = new Date();
-		const start = new Date(today);
-		start.setDate(start.getDate() - weeks * 7 + 1);
+		const todayDow = today.getDay(); // 0=Sun … 6=Sat
+		// go back enough days so first column is a Sunday
+		const startDate = new Date(today);
+		startDate.setDate(today.getDate() - (weeks * 7 - 1) - todayDow);
+
 		const columns = [];
-		const cursor = new Date(start);
+		const cursor = new Date(startDate);
 		let max = 1;
-		const mLabels = [];
-		let lastMonth = -1;
-		for (let w = 0; w < weeks; w++) {
+		// Track which column each month first appears in
+		const monthFirstCol = {}; // key: "YYYY-M" → col index
+		let colIdx = 0;
+		while (colIdx < weeks) {
 			const days = [];
 			const colMonth = cursor.getMonth();
-			if (colMonth !== lastMonth) {
-				mLabels.push({ col: w, monthIndex: colMonth, label: cursor.toLocaleDateString('en', { month: 'short' }) });
-				lastMonth = colMonth;
+			const colYear = cursor.getFullYear();
+			const monthKey = `${colYear}-${colMonth}`;
+			if (!(monthKey in monthFirstCol)) {
+				monthFirstCol[monthKey] = { col: colIdx, monthIndex: colMonth, year: colYear, label: cursor.toLocaleDateString('en', { month: 'short' }) };
 			}
-			for (let d = 0; d < ROWS; d++) {
+			for (let r = 0; r < ROWS; r++) {
 				const key = dateKeyLocal(cursor);
 				const count = totalsByDay[key] || 0;
 				max = Math.max(max, count);
@@ -54,14 +58,24 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 				cursor.setDate(cursor.getDate() + 1);
 			}
 			columns.push(days);
+			colIdx++;
 		}
-		return { cols: columns, maxCount: max, monthLabels: mLabels };
+
+		const allMonthEntries = Object.values(monthFirstCol).sort((a, b) => a.col - b.col);
+		const top = allMonthEntries.filter(m => m.monthIndex % 2 === 0); // Jan, Mar, May, Jul, Sep, Nov
+		const bottom = allMonthEntries.filter(m => m.monthIndex % 2 === 1); // Feb, Apr, Jun, Aug, Oct, Dec
+
+		return {
+			cols: columns,
+			maxCount: max,
+			topLabels: top,
+			bottomLabels: bottom,
+			year: today.getFullYear(),
+		};
 	}, [dailyRows, weeks]);
 
 	function withOpacity(hex, alpha) {
-		const a = Math.round(alpha * 255)
-			.toString(16)
-			.padStart(2, '0');
+		const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
 		return `${hex}${a}`;
 	}
 
@@ -69,34 +83,32 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 		if (count === 0) return theme.border;
 		const intensity = Math.min(1, count / maxCount);
 		const steps = [0.3, 0.5, 0.75, 1];
-		const step =
-			steps[Math.min(steps.length - 1, Math.floor(intensity * steps.length))];
+		const step = steps[Math.min(steps.length - 1, Math.floor(intensity * steps.length))];
 		return withOpacity(theme.accent, step);
 	}
 
-	const gridWidth = weeks * cell + (weeks - 1) * GAP;
-	const gridHeight = ROWS * cell + (ROWS - 1) * GAP;
+	const gridWidth = weeks * CELL + (weeks - 1) * GAP;
+	const gridHeight = ROWS * CELL + (ROWS - 1) * GAP;
+
+	function labelPosition(col) {
+		return col * (CELL + GAP);
+	}
 
 	return (
 		<View>
-			{/* Month labels row */}
-			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH }]}>
-				{monthLabels.map(({ col, monthIndex, label }) =>
-					monthIndex % 2 === 0 ? (
-						<Text
-							key={`m-${col}`}
-							style={[
-								styles.monthLabel,
-								{ color: theme.textMuted, left: col * (cell + GAP) },
-							]}
-						>
-							{label}
-						</Text>
-					) : null,
-				)}
+			{/* TOP labels: Jan, Mar, May, Jul, Sep, Nov */}
+			<View style={[styles.labelRow, { marginLeft: Y_LABEL_WIDTH }]}>
+				{topLabels.map(({ col, label }) => (
+					<Text
+						key={`top-${col}`}
+						style={[styles.monthLabel, { color: theme.accent, left: labelPosition(col) }]}
+					>
+						{label}
+					</Text>
+				))}
 			</View>
 
-			{/* Grid with Y labels */}
+			{/* Grid */}
 			<View style={styles.gridRow}>
 				{/* Day-of-week labels */}
 				<View style={[styles.yLabels, { height: gridHeight }]}>
@@ -107,8 +119,8 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 								styles.dayLabel,
 								{
 									color: theme.textMuted,
-									height: cell,
-									lineHeight: cell,
+									height: CELL,
+									lineHeight: CELL,
 									marginBottom: i < ROWS - 1 ? GAP : 0,
 								},
 							]}
@@ -123,16 +135,28 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 						days.map((count, rowIndex) => (
 							<Rect
 								key={`${colIndex}-${rowIndex}`}
-								x={colIndex * (cell + GAP)}
-								y={rowIndex * (cell + GAP)}
-								width={cell}
-								height={cell}
+								x={colIndex * (CELL + GAP)}
+								y={rowIndex * (CELL + GAP)}
+								width={CELL}
+								height={CELL}
 								rx={2}
 								fill={colorFor(count)}
 							/>
 						)),
 					)}
 				</Svg>
+			</View>
+
+			{/* BOTTOM labels: Feb, Apr, Jun, Aug, Oct, Dec */}
+			<View style={[styles.labelRow, { marginLeft: Y_LABEL_WIDTH, marginTop: 4 }]}>
+				{bottomLabels.map(({ col, label }) => (
+					<Text
+						key={`bot-${col}`}
+						style={[styles.monthLabel, { color: theme.textMuted, left: labelPosition(col) }]}
+					>
+						{label}
+					</Text>
+				))}
 			</View>
 
 			{/* Legend */}
@@ -144,10 +168,9 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 						style={[
 							styles.legendCell,
 							{
-								backgroundColor:
-									i === 0 ? theme.border : withOpacity(theme.accent, alpha),
-								width: cell,
-								height: cell,
+								backgroundColor: i === 0 ? theme.border : withOpacity(theme.accent, alpha),
+								width: CELL,
+								height: CELL,
 							},
 						]}
 					/>
@@ -155,38 +178,34 @@ export default function ActivityHeatmap({ dailyRows, weeks, width }) {
 				<Text style={[styles.legendText, { color: theme.textMuted }]}>More</Text>
 			</View>
 
-			{/* Month labels bottom */}
-			<View style={[styles.monthRow, { marginLeft: Y_LABEL_WIDTH, marginTop: 4, marginBottom: 0 }]}>
-				{monthLabels.map(({ col, monthIndex, label }) =>
-					monthIndex % 2 === 1 ? (
-						<Text
-							key={`m-${col}`}
-							style={[
-								styles.monthLabel,
-								{ color: theme.textMuted, left: col * (cell + GAP) },
-							]}
-						>
-							{label}
-						</Text>
-					) : null,
-				)}
-			</View>
-
-			<Text style={[styles.yearLabel, { color: theme.textMuted }]}>
-				{new Date().getFullYear()}
-			</Text>
+			{/* Year label */}
+			<Text style={[styles.yearLabel, { color: theme.textMuted }]}>{year}</Text>
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	monthRow: { flexDirection: 'row', position: 'relative', height: X_LABEL_HEIGHT, marginBottom: 2 },
-	monthLabel: { position: 'absolute', fontSize: 9, fontWeight: '600' },
+	labelRow: {
+		position: 'relative',
+		height: LABEL_ROW_H,
+		marginBottom: 2,
+	},
+	monthLabel: {
+		position: 'absolute',
+		fontSize: 9,
+		fontWeight: '700',
+	},
 	gridRow: { flexDirection: 'row' },
 	yLabels: { width: Y_LABEL_WIDTH, flexDirection: 'column' },
 	dayLabel: { fontSize: 9, textAlign: 'center' },
-	legend: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8, justifyContent: 'center' },
+	legend: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 3,
+		marginTop: 8,
+		justifyContent: 'center',
+	},
 	legendCell: { borderRadius: 2 },
 	legendText: { fontSize: 9, marginHorizontal: 4 },
-	yearLabel: { textAlign: 'center', fontSize: 10, marginTop: 8, fontWeight: '600' },
+	yearLabel: { textAlign: 'center', fontSize: 10, fontWeight: '700', marginTop: 6 },
 });

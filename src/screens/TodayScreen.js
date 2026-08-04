@@ -12,7 +12,7 @@ import GraphCarousel from '../components/home/GraphCarousel';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LINE_CHART_DAYS = 14;
-const HEATMAP_WEEKS = 20;
+const HEATMAP_WEEKS = 52;
 const MAX_FETCH_DAYS = 365;
 
 function dateKeyLocal(d) {
