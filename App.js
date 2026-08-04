@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -33,15 +33,12 @@ function Root() {
 
 	if (!dbReady) {
 		return (
-			<View
-				style={{
-					flex: 1,
-					alignItems: 'center',
-					justifyContent: 'center',
-					backgroundColor: theme.bg,
-				}}
-			>
-				<ActivityIndicator color={theme.accent} />
+			<View style={styles.splash}>
+				<Image
+					source={require('./assets/splash.png')}
+					style={styles.splashImg}
+					resizeMode="contain"
+				/>
 			</View>
 		);
 	}
@@ -119,3 +116,16 @@ export default function App() {
 		</GestureHandlerRootView>
 	);
 }
+
+const styles = StyleSheet.create({
+	splash: {
+		flex: 1,
+		backgroundColor: '#0E1926',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	splashImg: {
+		width: '80%',
+		height: '80%',
+	},
+});

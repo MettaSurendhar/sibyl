@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -77,13 +77,17 @@ export default function TodayScreen({ navigation }) {
 			style={[styles.container, { backgroundColor: theme.bg }]}
 			contentContainerStyle={{
 				paddingTop: insets.top + 20,
-				paddingBottom: insets.bottom + 140,
+				paddingBottom: insets.bottom + 80,
 			}}
 			showsVerticalScrollIndicator={false}
 		>
 			{/* Header: Title + Settings icon */}
 			<View style={styles.headerRow}>
-				<Text style={[styles.title, { color: theme.text }]}>Home</Text>
+				<Image
+					source={require('../../assets/icon.png')}
+					style={styles.headerIcon}
+					resizeMode="contain"
+				/>
 				<TouchableOpacity
 					onPress={() => navigation.navigate('Settings')}
 					style={[styles.settingsBtn, { backgroundColor: theme.surfaceAlt }]}
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 20,
 		marginBottom: 18,
 	},
-	title: { fontSize: 24, fontWeight: '700' },
+	headerIcon: { width: 80, height: 32 },
 	settingsBtn: {
 		width: 36,
 		height: 36,

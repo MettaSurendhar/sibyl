@@ -102,7 +102,6 @@ export default function GraphCarousel({
 				{activeTab === 'heatmap' && (
 					<ActivityHeatmap
 						dailyRows={dailyRows}
-						weeks={heatmapWeeks}
 						width={CHART_WIDTH}
 					/>
 				)}
