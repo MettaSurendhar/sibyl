@@ -16,6 +16,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { zip } from 'react-native-zip-archive';
 import { useAlert } from '../theme/AlertContext';
 import { useTheme } from '../theme/ThemeContext';
 import {
@@ -220,10 +222,55 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 
 	async function handleShare() {
 		const targets = entries.filter((e) => selectedIds.includes(e.id));
-		for (const t of targets) {
-			const lastSegUri = t.segments[t.segments.length - 1]?.uri;
+		
+		if (targets.length === 1) {
+			const lastSegUri = targets[0].segments[targets[0].segments.length - 1]?.uri;
 			if (lastSegUri && (await Sharing.isAvailableAsync())) {
 				await Sharing.shareAsync(lastSegUri);
+			}
+			return;
+		}
+
+		if (targets.length > 1) {
+			if (!(await Sharing.isAvailableAsync())) return;
+
+			try {
+				const tempDir = FileSystem.cacheDirectory + 'share_zip_' + Date.now() + '/';
+				await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
+
+				// Copy each file into the temp dir with its proper entry name
+				let index = 1;
+				for (const t of targets) {
+					const lastSegUri = t.segments[t.segments.length - 1]?.uri;
+					if (lastSegUri) {
+						// Clean filename of invalid characters, fallback to index if empty
+						let cleanName = (t.name || 'Recording ' + index).replace(/[^a-zA-Z0-9 -]/g, '_').trim();
+						if (!cleanName) cleanName = 'Recording ' + index;
+						
+						const ext = lastSegUri.split('.').pop() || 'm4a';
+						const destUri = tempDir + cleanName + '.' + ext;
+						
+						// If a file with the same name already exists, append index
+						const finalDestUri = (await FileSystem.getInfoAsync(destUri)).exists 
+							? tempDir + cleanName + '_' + index + '.' + ext 
+							: destUri;
+
+						await FileSystem.copyAsync({ from: lastSegUri, to: finalDestUri });
+					}
+					index++;
+				}
+
+				const zipPath = FileSystem.cacheDirectory + 'Sibyl_Recordings.zip';
+				await zip(tempDir, zipPath);
+
+				await Sharing.shareAsync(zipPath, { dialogTitle: 'Share zipped recordings' });
+
+				// Cleanup
+				await FileSystem.deleteAsync(tempDir, { idempotent: true });
+				await FileSystem.deleteAsync(zipPath, { idempotent: true });
+			} catch (e) {
+				console.error('Zip sharing failed:', e);
+				alert('Error', 'Failed to create zip file for sharing.');
 			}
 		}
 	}
