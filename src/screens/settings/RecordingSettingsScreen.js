@@ -26,7 +26,7 @@ import {
 	folderDisplayName,
 	isExternalFolderSupported,
 } from '../../utils/externalFolder';
-import { backfillRecordingsToFolder } from '../../db/entries';
+import { syncWithFolder } from '../../db/entries';
 
 export default function RecordingSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
@@ -34,11 +34,12 @@ export default function RecordingSettingsScreen({ navigation }) {
 	const insets = useSafeAreaInsets();
 	const [recordingsFolderUri, setRecordingsFolderUriState] = useState(null);
 	const [transcriptFolderUri, setTranscriptFolderUriState] = useState(null);
-	const [backfillModalVisible, setBackfillModalVisible] = useState(false);
-	const [backfilling, setBackfilling] = useState(false);
-	const [backfillProgress, setBackfillProgress] = useState({
+	const [syncModalVisible, setSyncModalVisible] = useState(false);
+	const [syncing, setSyncing] = useState(false);
+	const [syncProgress, setSyncProgress] = useState({
 		done: 0,
 		total: 0,
+		phase: ''
 	});
 
 	useEffect(() => {
@@ -58,7 +59,7 @@ export default function RecordingSettingsScreen({ navigation }) {
 		if (picked) {
 			await setRecordingsFolderUri(picked);
 			setRecordingsFolderUriState(picked);
-			setBackfillModalVisible(true);
+			setSyncModalVisible(true);
 		}
 	}
 
@@ -67,30 +68,30 @@ export default function RecordingSettingsScreen({ navigation }) {
 		setRecordingsFolderUriState(null);
 	}
 
-	async function runBackfill() {
-		setBackfillModalVisible(false);
+	async function runSync() {
+		setSyncModalVisible(false);
 		if (!recordingsFolderUri) return;
-		setBackfilling(true);
-		setBackfillProgress({ done: 0, total: 0 });
-		const result = await backfillRecordingsToFolder(
+		setSyncing(true);
+		setSyncProgress({ done: 0, total: 0, phase: 'starting' });
+		const result = await syncWithFolder(
 			recordingsFolderUri,
-			setBackfillProgress,
+			setSyncProgress,
 		);
-		setBackfilling(false);
+		setSyncing(false);
 		if (result.total === 0) {
 			alert(
-				'Nothing to copy',
-				"You don't have any recordings saved locally yet.",
-			);
-		} else if (result.failed > 0) {
-			alert(
-				'Copy finished',
-				`Copied ${result.copied} of ${result.total} recording${result.total === 1 ? '' : 's'}. ${result.failed} couldn't be copied.`,
+				'Folder is in sync',
+				"No new recordings to push, and no new files to pull.",
 			);
 		} else {
+			let message = [];
+			if (result.pushed > 0) message.push(`Exported ${result.pushed} to folder.`);
+			if (result.pulled > 0) message.push(`Imported ${result.pulled} from folder.`);
+			if (result.failed > 0) message.push(`Failed to sync ${result.failed} files.`);
+			
 			alert(
-				'Copy finished',
-				`Copied ${result.copied} recording${result.copied === 1 ? '' : 's'} to your chosen folder.`,
+				'Sync finished',
+				message.join('\n')
 			);
 		}
 	}
@@ -129,7 +130,7 @@ export default function RecordingSettingsScreen({ navigation }) {
 				title='Recordings saving folder'
 				right={
 					<InfoPopover title='Recordings saving folder'>
-						{`• Optional: saves a copy of every new recording to this folder\n• Lets you browse files outside the app\n• Recordings still play and edit from the app's internal storage\n• Android only (for now)`}
+						{`• Two-way sync: automatically saves copies of your new recordings to this folder\n• Import: sync pulls missing audio files (mp3, m4a, wav) from this folder into Sibyl\n• Note: Imported files will have a flat dummy waveform instead of a real one, but they will play normally\n• Lets you browse files outside the app\n• Recordings still play and edit from the app's internal storage\n• Android only (for now)`}
 					</InfoPopover>
 				}
 			>
@@ -171,36 +172,34 @@ export default function RecordingSettingsScreen({ navigation }) {
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
-							disabled={backfilling}
-							onPress={() => setBackfillModalVisible(true)}
+							disabled={syncing}
+							onPress={() => setSyncModalVisible(true)}
 							style={[
 								styles.navButton,
 								{
 									backgroundColor: theme.surfaceAlt,
 									borderColor: theme.border,
 									marginTop: 12,
-									opacity: backfilling ? 0.6 : 1,
+									opacity: syncing ? 0.6 : 1,
 								},
 							]}
 						>
 							<Feather
-								name='upload'
+								name='refresh-cw'
 								size={18}
 								color={theme.text}
 								style={{ marginRight: 10 }}
 							/>
 							<Text style={{ color: theme.text, flex: 1, fontWeight: '600' }}>
-								{backfilling
-									? `Copying ${backfillProgress.done}/${backfillProgress.total}…`
-									: 'Copy existing recordings to this folder'}
+								{syncing
+									? `Syncing (${syncProgress.phase})... ${syncProgress.done}/${syncProgress.total}`
+									: 'Sync with folder (Import/Export)'}
 							</Text>
 						</TouchableOpacity>
 						<Text
 							style={{ color: theme.textMuted, marginTop: 6, fontSize: 12 }}
 						>
-							Copies everything already saved locally, not just new recordings.
-							Running it again on the same folder may create duplicates for
-							files already copied.
+							Pushes any of your existing Sibyl recordings into this folder, and pulls in any foreign audio files it finds there.
 						</Text>
 					</>
 				)}
@@ -254,13 +253,13 @@ export default function RecordingSettingsScreen({ navigation }) {
 			</SettingsSection>
 
 			<ConfirmModal
-				visible={backfillModalVisible}
-				title='Copy existing recordings?'
-				message="This copies every recording you already have saved locally into the folder you just chose, so nothing's left behind. New recordings will keep mirroring here automatically either way."
-				confirmLabel='Copy now'
+				visible={syncModalVisible}
+				title='Sync with folder?'
+				message="This will copy any existing recordings into your chosen folder, and import any new audio files it finds there into Sibyl. Missing waveforms will be generated as flat lines."
+				confirmLabel='Sync now'
 				cancelLabel='Not now'
-				onCancel={() => setBackfillModalVisible(false)}
-				onConfirm={runBackfill}
+				onCancel={() => setSyncModalVisible(false)}
+				onConfirm={runSync}
 			/>
 		</ScrollView>
 	);

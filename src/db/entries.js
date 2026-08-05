@@ -5,6 +5,8 @@ import {
 	isExternalFolderSupported,
 	deleteFileByUri,
 } from '../utils/externalFolder';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 
 // Best-effort mirror of a finished recording into the user's chosen external folder (Settings ->
 // Saving folder), if one is configured. The app's own internal copy (in FileSystem storage) stays
@@ -34,50 +36,127 @@ async function mirrorToExternalFolder(uri, title) {
 	}
 }
 
-// Copies every recording currently in the app's local storage into a chosen external folder.
-// Used from Settings both right after picking a new Saving folder (offered immediately) and
-// on-demand later via the same button, e.g. if the user skipped it the first time or reconnected
-// a folder. Each segment across every entry is copied individually - same per-file approach
-// mirrorToExternalFolder already uses for new recordings going forward. Best-effort per file: one
-// failure doesn't stop the rest. onProgress (optional) fires after each attempt with
-// { done, total } for a live "Copying x/y" indicator; the final { copied, failed, total } lets
-// the caller show a summary.
-export async function backfillRecordingsToFolder(folderUri, onProgress) {
-	const db = await getDb();
-	const segments = await db.getAllAsync(`
-    SELECT s.id as id, s.uri as uri, e.title as title
-    FROM segments s
-    JOIN entries e ON e.id = s.entryId
-    ORDER BY s.createdAt ASC
-  `);
-	let copied = 0;
-	let failed = 0;
-	const total = segments.length;
-	for (const seg of segments) {
-		try {
-			const ext = (seg.uri.split('.').pop() || 'm4a').split('?')[0];
-			const safeTitle =
-				(seg.title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() ||
-				'recording';
-			const externalUri = await copyFileToFolder(
-				folderUri,
-				seg.uri,
-				`${safeTitle}.${ext}`,
-				`audio/${ext}`,
-			);
-			if (externalUri) {
-				await db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [
-					externalUri,
-					seg.id,
-				]);
-			}
-			copied++;
-		} catch (e) {
-			failed++;
-		}
-		if (onProgress) onProgress({ done: copied + failed, total });
+function generateDummyWaveform() {
+	const waveform = [];
+	for (let i = 0; i < 200; i++) {
+		// A gentle varying pattern between -30dB and -10dB
+		const val = -20 + Math.sin(i * 0.2) * 10;
+		waveform.push(val);
 	}
-	return { copied, failed, total };
+	return waveform;
+}
+
+export async function syncWithFolder(folderUri, onProgress) {
+	if (!isExternalFolderSupported() || !folderUri) {
+		return { pushed: 0, pulled: 0, failed: 0, total: 0 };
+	}
+	const db = await getDb();
+	const SAF = FileSystem.StorageAccessFramework;
+	
+	let pushed = 0;
+	let pulled = 0;
+	let failed = 0;
+	let totalSteps = 0;
+	let currentStep = 0;
+
+	try {
+		const filesInFolder = await SAF.readDirectoryAsync(folderUri);
+		const existingSegments = await db.getAllAsync(`
+			SELECT s.id, s.uri, s.externalUri, s.entryId, e.title 
+			FROM segments s
+			JOIN entries e ON e.id = s.entryId
+		`);
+		
+		// 1. PUSH: Find segments that have no externalUri, or whose externalUri is not in the folder
+		const toPush = existingSegments.filter(s => !s.externalUri || !filesInFolder.includes(s.externalUri));
+		
+		// 2. PULL: Find files in the folder that aren't in any segment's externalUri
+		const knownExternalUris = new Set(existingSegments.map(s => s.externalUri).filter(Boolean));
+		const toPull = filesInFolder.filter(uri => {
+			const ext = uri.split('.').pop()?.toLowerCase();
+			const isAudio = ['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext);
+			return isAudio && !knownExternalUris.has(uri);
+		});
+
+		totalSteps = toPush.length + toPull.length;
+		if (totalSteps === 0) return { pushed: 0, pulled: 0, failed: 0, total: 0 };
+
+		// --- Execute PUSH ---
+		for (const seg of toPush) {
+			try {
+				const ext = (seg.uri.split('.').pop() || 'm4a').split('?')[0];
+				const safeTitle = (seg.title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() || 'recording';
+				
+				const newExternalUri = await copyFileToFolder(
+					folderUri,
+					seg.uri,
+					`${safeTitle}.${ext}`,
+					`audio/${ext}`
+				);
+				if (newExternalUri) {
+					await db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [newExternalUri, seg.id]);
+				}
+				pushed++;
+			} catch (e) {
+				failed++;
+			}
+			currentStep++;
+			if (onProgress) onProgress({ done: currentStep, total: totalSteps, phase: 'exporting' });
+		}
+
+		// --- Execute PULL ---
+		const internalDir = FileSystem.documentDirectory + 'recordings/';
+		await FileSystem.makeDirectoryAsync(internalDir, { intermediates: true }).catch(() => {});
+
+		for (const safUri of toPull) {
+			try {
+				const decoded = decodeURIComponent(safUri);
+				const filename = decoded.split('/').pop() || `imported_${Date.now()}.mp3`;
+				// Ensure safe internal filename
+				const safeFilename = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+				const internalUri = internalDir + Date.now() + '_' + safeFilename;
+				
+				try {
+					await FileSystem.copyAsync({ from: safUri, to: internalUri });
+				} catch {
+					const b64 = await FileSystem.readAsStringAsync(safUri, { encoding: 'base64' });
+					await FileSystem.writeAsStringAsync(internalUri, b64, { encoding: 'base64' });
+				}
+
+				const { sound, status } = await Audio.Sound.createAsync({ uri: internalUri });
+				const durationMs = status.durationMillis || 0;
+				await sound.unloadAsync();
+
+				const entryId = newId('ent');
+				const title = filename.replace(/\.[^/.]+$/, ""); // strip extension for the title
+				const now = Date.now();
+				const waveform = JSON.stringify(generateDummyWaveform());
+
+				await db.runAsync(
+					'INSERT INTO entries (id, title, createdAt, updatedAt, totalDurationMs, waveform) VALUES (?, ?, ?, ?, ?, ?)',
+					[entryId, title, now, now, durationMs, waveform]
+				);
+
+				const segId = newId('seg');
+				await db.runAsync(
+					'INSERT INTO segments (id, entryId, uri, externalUri, durationMs, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?)',
+					[segId, entryId, internalUri, safUri, durationMs, now]
+				);
+				
+				pulled++;
+			} catch (e) {
+				console.error("Failed to pull", safUri, e);
+				failed++;
+			}
+			currentStep++;
+			if (onProgress) onProgress({ done: currentStep, total: totalSteps, phase: 'importing' });
+		}
+		
+	} catch (e) {
+		console.error("Sync error:", e);
+	}
+	
+	return { pushed, pulled, failed, total: totalSteps };
 }
 
 // Returns entries with their segments and category joined, grouped-ready (sorted newest first)

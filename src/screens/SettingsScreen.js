@@ -30,7 +30,7 @@ import {
 	folderDisplayName,
 	isExternalFolderSupported,
 } from '../utils/externalFolder';
-import { backfillRecordingsToFolder } from '../db/entries';
+import { syncWithFolder } from '../db/entries';
 import {
 	getUntaggedTemplate,
 	setUntaggedTemplate,
@@ -137,7 +137,7 @@ export default function SettingsScreen({ navigation }) {
 		if (!recordingsFolderUri) return;
 		setBackfilling(true);
 		setBackfillProgress({ done: 0, total: 0 });
-		const result = await backfillRecordingsToFolder(
+		const result = await syncWithFolder(
 			recordingsFolderUri,
 			setBackfillProgress,
 		);
