@@ -201,8 +201,20 @@ export default function PlaybackScreen({ route, navigation }) {
 	async function handleShare() {
 		setMenuOpen(false);
 		const lastUri = entry.segments[entry.segments.length - 1]?.uri;
-		if (lastUri && (await Sharing.isAvailableAsync()))
+		if (!lastUri || !(await Sharing.isAvailableAsync())) return;
+
+		try {
+			// Copy to a temp file with the user-defined entry name so the share sheet shows the right filename
+			const ext = lastUri.split('.').pop() || 'm4a';
+			const cleanName = (entry.title || 'Recording').replace(/[^a-zA-Z0-9 \-_]/g, '_').trim();
+			const tempUri = FileSystem.cacheDirectory + cleanName + '.' + ext;
+			await FileSystem.copyAsync({ from: lastUri, to: tempUri });
+			await Sharing.shareAsync(tempUri);
+			await FileSystem.deleteAsync(tempUri, { idempotent: true });
+		} catch {
+			// Fallback to sharing internal URI directly
 			await Sharing.shareAsync(lastUri);
+		}
 	}
 
 	function handleRename() {
@@ -243,9 +255,13 @@ export default function PlaybackScreen({ route, navigation }) {
 				: (totalSizeBytes / 1024).toFixed(2) + ' KB';
 
 			// The internal app path for the audio file(s)
+			const lastUri = entry.segments[entry.segments.length - 1]?.uri || '';
 			const internalUri = entry.segments.length === 1
-				? entry.segments[0].uri
+				? lastUri
 				: `${entry.segments.length} segments stored internally`;
+
+			// File type from extension
+			const ext = lastUri.split('.').pop()?.toUpperCase() || '—';
 
 			// User-configured save folders (may be null if not set)
 			const recFolderUri = await getRecordingsFolderUri();
@@ -262,6 +278,7 @@ export default function PlaybackScreen({ route, navigation }) {
 				time: new Date(entry.createdAt).toLocaleString(),
 				duration: formatDuration(entry.totalDurationMs),
 				size: sizeStr,
+				fileType: ext,
 				appPath: internalUri,
 				recordingsFolder: friendlyFolder(recFolderUri),
 				transcriptFolder: friendlyFolder(transcriptFolderUri),
@@ -272,6 +289,7 @@ export default function PlaybackScreen({ route, navigation }) {
 				time: new Date(entry.createdAt).toLocaleString(),
 				duration: formatDuration(entry.totalDurationMs),
 				size: '—',
+				fileType: '—',
 				appPath: '—',
 				recordingsFolder: '—',
 				transcriptFolder: '—',
@@ -954,6 +972,7 @@ export default function PlaybackScreen({ route, navigation }) {
 								{ label: 'Created', value: detailsData.time },
 								{ label: 'Duration', value: detailsData.duration },
 								{ label: 'Size', value: detailsData.size },
+								{ label: 'File Type', value: detailsData.fileType },
 								{ label: 'App Path', value: detailsData.appPath },
 								{ label: 'Recordings Save Folder', value: detailsData.recordingsFolder },
 								{ label: 'Transcript Download Folder', value: detailsData.transcriptFolder },

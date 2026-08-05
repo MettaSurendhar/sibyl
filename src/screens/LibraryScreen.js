@@ -224,9 +224,21 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 		const targets = entries.filter((e) => selectedIds.includes(e.id));
 		
 		if (targets.length === 1) {
-			const lastSegUri = targets[0].segments[targets[0].segments.length - 1]?.uri;
+			const target = targets[0];
+			const lastSegUri = target.segments[target.segments.length - 1]?.uri;
 			if (lastSegUri && (await Sharing.isAvailableAsync())) {
-				await Sharing.shareAsync(lastSegUri);
+				try {
+					// Copy to a temp file with the user-defined entry name
+					const ext = lastSegUri.split('.').pop() || 'm4a';
+					const cleanName = (target.name || 'Recording').replace(/[^a-zA-Z0-9 \-_]/g, '_').trim();
+					const tempUri = FileSystem.cacheDirectory + cleanName + '.' + ext;
+					await FileSystem.copyAsync({ from: lastSegUri, to: tempUri });
+					await Sharing.shareAsync(tempUri);
+					await FileSystem.deleteAsync(tempUri, { idempotent: true });
+				} catch {
+					// Fallback to sharing internal URI directly
+					await Sharing.shareAsync(lastSegUri);
+				}
 			}
 			return;
 		}
