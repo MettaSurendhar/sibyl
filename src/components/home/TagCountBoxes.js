@@ -1,7 +1,94 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, TouchableWithoutFeedback, Animated, StyleSheet } from 'react-native';
 import Text from '../../theme/Text';
 import { useTheme } from '../../theme/ThemeContext';
+import { Feather } from '@expo/vector-icons';
+
+function AnimatedTagBox({ tag, onTagPress }) {
+	const { theme } = useTheme();
+	const scale = useRef(new Animated.Value(1)).current;
+	const [displayCount, setDisplayCount] = useState(0);
+
+	useEffect(() => {
+		if (tag.count === 0) {
+			setDisplayCount(0);
+			return;
+		}
+		
+		let current = 0;
+		const target = tag.count;
+		const duration = 600;
+		const stepTime = Math.max(20, Math.floor(duration / target));
+		
+		const timer = setInterval(() => {
+			current += Math.max(1, Math.floor(target / 15));
+			if (current >= target) {
+				setDisplayCount(target);
+				clearInterval(timer);
+			} else {
+				setDisplayCount(current);
+			}
+		}, stepTime);
+		
+		return () => clearInterval(timer);
+	}, [tag.count]);
+
+	const handlePressIn = () => {
+		Animated.spring(scale, {
+			toValue: 0.95,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handlePressOut = () => {
+		Animated.spring(scale, {
+			toValue: 1,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	return (
+		<TouchableWithoutFeedback
+			onPress={() => onTagPress && onTagPress(tag.id)}
+			onPressIn={handlePressIn}
+			onPressOut={handlePressOut}
+		>
+			<Animated.View
+				style={[
+					styles.box,
+					{
+						transform: [{ scale }],
+						backgroundColor: theme.surface,
+						borderColor: theme.border,
+						borderTopColor: tag.color,
+					},
+				]}
+			>
+				{tag.count === 0 ? (
+					<>
+						<Feather name={tag.icon || 'tag'} size={24} color={theme.textMuted} />
+						<Text style={[styles.emptyText, { color: theme.textMuted }]} numberOfLines={2}>
+							Start your first {tag.name.toLowerCase()}
+						</Text>
+					</>
+				) : (
+					<>
+						<View style={styles.countRow}>
+							<Text style={[styles.count, { color: theme.text }]}>{displayCount}</Text>
+							<Feather name={tag.icon || 'tag'} size={20} color={theme.textMuted} style={{ marginLeft: 6 }} />
+						</View>
+						<Text
+							style={[styles.name, { color: theme.textMuted }]}
+							numberOfLines={1}
+						>
+							{tag.name}
+						</Text>
+					</>
+				)}
+			</Animated.View>
+		</TouchableWithoutFeedback>
+	);
+}
 
 export default function TagCountBoxes({ tags, onTagPress }) {
 	const { theme } = useTheme();
@@ -10,41 +97,7 @@ export default function TagCountBoxes({ tags, onTagPress }) {
 	return (
 		<View style={styles.grid}>
 			{tags.map((tag) => (
-				<TouchableOpacity
-					key={tag.id ?? 'untagged'}
-					onPress={() => onTagPress && onTagPress(tag.id)}
-					activeOpacity={0.7}
-					style={[
-						styles.box,
-						{
-							backgroundColor: theme.surface,
-							borderColor: theme.border,
-							borderTopColor: tag.color,
-						},
-					]}
-				>
-					{tag.count === 0 ? (
-						<>
-							<Text style={styles.icon}>{tag.icon}</Text>
-							<Text style={[styles.emptyText, { color: theme.textMuted }]} numberOfLines={2}>
-								Start your first {tag.name.toLowerCase()}
-							</Text>
-						</>
-					) : (
-						<>
-							<View style={styles.countRow}>
-								<Text style={[styles.count, { color: theme.text }]}>{tag.count}</Text>
-								<Text style={styles.icon}>{tag.icon}</Text>
-							</View>
-							<Text
-								style={[styles.name, { color: theme.textMuted }]}
-								numberOfLines={1}
-							>
-								{tag.name}
-							</Text>
-						</>
-					)}
-				</TouchableOpacity>
+				<AnimatedTagBox key={tag.id ?? 'untagged'} tag={tag} onTagPress={onTagPress} />
 			))}
 		</View>
 	);
@@ -74,7 +127,6 @@ const styles = StyleSheet.create({
 		gap: 6,
 	},
 	count: { fontSize: 34, fontWeight: '800' },
-	icon: { fontSize: 24 },
 	name: { fontSize: 12, fontWeight: '600' },
 	emptyText: {
 		fontSize: 11,

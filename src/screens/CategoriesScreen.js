@@ -14,7 +14,7 @@ import {
 } from '../db/categories';
 import { renderTemplate, DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';
 import ConfirmModal from '../components/ConfirmModal';
-import { TAG_COLOR_PALETTE, TAG_EMOJI_PRESETS, iconForCategory } from '../utils/tagColors';
+import { TAG_COLOR_PALETTE, TAG_ICON_PRESETS, iconForCategory } from '../utils/tagColors';
 
 export default function CategoriesScreen({ navigation }) {
   const { theme } = useTheme();
@@ -30,7 +30,20 @@ export default function CategoriesScreen({ navigation }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const refresh = useCallback(async () => {
-    const cats = await listCategories();
+    let cats = await listCategories();
+    
+    // Quick migration: if an icon is not a valid feather icon (contains emojis), set to default
+    let migrated = false;
+    for (const c of cats) {
+      if (c.icon && !/^[a-z\-]+$/.test(c.icon)) {
+        await updateCategory(c.id, { icon: 'tag' });
+        migrated = true;
+      }
+    }
+    if (migrated) {
+      cats = await listCategories();
+    }
+    
     setCategories(cats);
     const countPairs = await Promise.all(cats.map(async (c) => [c.id, await getCategoryEntryCount(c.id)]));
     setCounts(Object.fromEntries(countPairs));
@@ -46,7 +59,7 @@ export default function CategoriesScreen({ navigation }) {
     const name = newName.trim();
     if (!name) return;
     const color = TAG_COLOR_PALETTE[categories.length % TAG_COLOR_PALETTE.length];
-    const icon = TAG_EMOJI_PRESETS[categories.length % TAG_EMOJI_PRESETS.length];
+    const icon = TAG_ICON_PRESETS[categories.length % TAG_ICON_PRESETS.length];
     await createCategory({ name, prefix: name, color, icon });
     setNewName('');
     refresh();
@@ -132,7 +145,7 @@ export default function CategoriesScreen({ navigation }) {
         renderItem={({ item }) => (
           <View style={[styles.catRow, { borderColor: theme.border }]}>
             <View style={[styles.swatch, { backgroundColor: item.color }]} />
-            <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(item)}</Text>
+            <Feather name={iconForCategory(item)} size={16} color={theme.text} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>{item.name}</Text>
               <Text style={{ color: theme.textMuted, fontSize: 12 }}>
@@ -177,26 +190,19 @@ export default function CategoriesScreen({ navigation }) {
               </View>
 
               <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Icon</Text>
-              <View style={[styles.emojiInputRow, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
-                <Text style={styles.emojiPreview}>{editIcon || '🏷️'}</Text>
-                <TextInput
-                  value={editIcon}
-                  onChangeText={(v) => {
-                    // grab only the first emoji character typed
-                    const chars = [...(v || '')];
-                    if (chars.length > 0) setEditIcon(chars[0]);
-                    else setEditIcon('');
-                  }}
-                  placeholder="Tap to pick an emoji from keyboard"
-                  placeholderTextColor={theme.textMuted}
-                  style={{ flex: 1, color: theme.text, fontSize: 15 }}
-                  maxLength={8}
-                />
-                {editIcon ? (
-                  <TouchableOpacity onPress={() => setEditIcon('')}>
-                    <Feather name="x" size={16} color={theme.textMuted} />
+              <View style={styles.colorRow}>
+                {TAG_ICON_PRESETS.map((iconName) => (
+                  <TouchableOpacity
+                    key={iconName}
+                    onPress={() => setEditIcon(iconName)}
+                    style={[
+                      styles.iconSwatch,
+                      { borderColor: editIcon === iconName ? theme.accent : 'transparent', borderWidth: 2 }
+                    ]}
+                  >
+                     <Feather name={iconName} size={20} color={theme.text} />
                   </TouchableOpacity>
-                ) : null}
+                ))}
               </View>
 
               <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Naming format</Text>
@@ -290,6 +296,5 @@ const styles = StyleSheet.create({
   btn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   colorSwatch: { width: 30, height: 30, borderRadius: 15 },
-  emojiInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14, gap: 10 },
-  emojiPreview: { fontSize: 24 },
+  iconSwatch: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +55,32 @@ function getBestTimeOfDay(timeOfDay) {
 	if (max === 0) return 'N/A';
 	if (best === 'morning') return 'Morning';
 	return best;
+}
+
+function AnimatedStreakDot({ day, index, theme }) {
+	const anim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		Animated.timing(anim, {
+			toValue: 1,
+			duration: 300,
+			delay: index * 20,
+			useNativeDriver: true,
+		}).start();
+	}, [index]);
+
+	return (
+		<Animated.View
+			style={[
+				styles.streakDot,
+				{
+					backgroundColor: day.hasRecording ? theme.accent : theme.border,
+					opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, day.hasRecording ? 1 : 0.5] }),
+					transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+				},
+			]}
+		/>
+	);
 }
 
 export default function AnalyticsScreen({ navigation }) {
@@ -143,17 +169,8 @@ export default function AnalyticsScreen({ navigation }) {
 						<Text style={[styles.streakSub, { color: theme.textMuted }]}>last {streakDays} days</Text>
 					</View>
 					<View style={styles.streakDots}>
-						{streakDotList.map((day) => (
-							<View
-								key={day.key}
-								style={[
-									styles.streakDot,
-									{
-										backgroundColor: day.hasRecording ? theme.accent : theme.border,
-										opacity: day.hasRecording ? 1 : 0.5,
-									},
-								]}
-							/>
+						{streakDotList.map((day, i) => (
+							<AnimatedStreakDot key={day.key} day={day} index={i} theme={theme} />
 						))}
 					</View>
 					<View style={styles.streakFooter}>

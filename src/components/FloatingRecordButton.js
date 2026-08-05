@@ -5,6 +5,9 @@ import Animated, {
 	useSharedValue,
 	useAnimatedStyle,
 	withSpring,
+	withRepeat,
+	withSequence,
+	withTiming,
 	runOnJS,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -39,6 +42,8 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 	const startY = useSharedValue(defaultY);
 	const isDragging = useSharedValue(false);
 	const scale = useSharedValue(1);
+	const pulseScale = useSharedValue(1);
+	const pulseOpacity = useSharedValue(0.6);
 
 	// Restore any remembered position once on mount.
 	useEffect(() => {
@@ -48,6 +53,23 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 				translateY.value = prefs.fabPosition.y;
 			}
 		});
+		// Start idle pulse animation
+		pulseScale.value = withRepeat(
+			withSequence(
+				withTiming(1.5, { duration: 1200 }),
+				withTiming(1, { duration: 0 }),
+			),
+			-1,
+			false,
+		);
+		pulseOpacity.value = withRepeat(
+			withSequence(
+				withTiming(0, { duration: 1200 }),
+				withTiming(0.5, { duration: 0 }),
+			),
+			-1,
+			false,
+		);
 	}, []);
 
 	function persistPosition(x, y) {
@@ -121,9 +143,17 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 		],
 	}));
 
+	const pulseStyle = useAnimatedStyle(() => ({
+		transform: [{ scale: pulseScale.value }],
+		opacity: pulseOpacity.value,
+	}));
+
 	return (
 		<GestureDetector gesture={composed}>
 			<Animated.View style={[styles.container, animatedStyle]}>
+				{/* Idle pulse ring */}
+				<Animated.View style={[styles.pulse, { borderColor: theme.accent }, pulseStyle]} />
+				
 				{/* Halo ring to lift it off the dark background */}
 				<View style={[styles.halo, { borderColor: theme.accent }]} />
 				
@@ -157,6 +187,15 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0,0,0,0.3)',
 		borderWidth: 1,
 		opacity: 0.3,
+	},
+	pulse: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		width: BUTTON_SIZE,
+		height: BUTTON_SIZE,
+		borderRadius: BUTTON_SIZE / 2,
+		borderWidth: 2,
 	},
 	fab: {
 		width: BUTTON_SIZE,

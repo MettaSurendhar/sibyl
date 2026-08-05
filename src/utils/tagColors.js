@@ -25,38 +25,37 @@ export const TAG_COLOR_PALETTE = [
 // A reasonably broad, journal-relevant set to start the emoji picker with. Manage Tags
 // (Phase 3) can still allow picking any system emoji beyond this list - these are just the
 // quick-pick defaults.
-export const TAG_EMOJI_PRESETS = [
-	'📔',
-	'💭',
-	'😤',
-	'🎙️',
-	'📝',
-	'💡',
-	'🌙',
-	'☀️',
-	'🔥',
-	'🎯',
-	'❤️',
-	'🧠',
-	'🌱',
-	'🎧',
-	'📌',
-	'✨',
-	'🗓️',
-	'🏃',
-	'🍀',
-	'🎉',
+export const TAG_ICON_PRESETS = [
+	'book',
+	'message-circle',
+	'mic',
+	'edit-3',
+	'lightbulb',
+	'moon',
+	'sun',
+	'zap',
+	'target',
+	'heart',
+	'cpu',
+	'leaf',
+	'headphones',
+	'map-pin',
+	'star',
+	'calendar',
+	'activity',
+	'smile',
+	'award',
 ];
 
 // Untagged is deliberately neutral/grey so it never gets confused with an actual tag's
 // assigned color in charts, boxes, or list rows.
 export const UNTAGGED_COLOR = '#7A8494';
-export const UNTAGGED_ICON = '🎙️';
+export const UNTAGGED_ICON = 'mic';
 
 // Fallback icon for a real tag that hasn't set one (e.g. tags created before Phase 3
 // added the icon field). Distinct from UNTAGGED_ICON so "no icon set" doesn't visually
 // collide with the Untagged bucket itself.
-export const DEFAULT_TAG_ICON = '🏷️';
+export const DEFAULT_TAG_ICON = 'tag';
 
 // Deterministic color for the Nth tag created, so colors stay stable/predictable instead
 // of random. Wraps around the palette once there are more tags than colors.
