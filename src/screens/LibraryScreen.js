@@ -48,7 +48,7 @@ if (
 
 const EMPTY_FILTER = { tagIds: [], datePreset: null, customRange: null };
 
-export default function LibraryScreen({ navigation, isEditMode, onEditModeChange }) {
+export default function LibraryScreen({ navigation, isEditMode, onEditModeChange, initialFilter, onFilterConsumed }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
 	const insets = useSafeAreaInsets();
@@ -88,6 +88,15 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 				setIsPlaying(false);
 			};
 		}, [refresh]),
+	);
+
+	useFocusEffect(
+		useCallback(() => {
+			if (initialFilter) {
+				setFilter(initialFilter);
+				if (onFilterConsumed) onFilterConsumed();
+			}
+		}, [initialFilter, onFilterConsumed])
 	);
 
 	// Close any open overlay on back button/gesture before letting default back navigation happen.

@@ -38,11 +38,17 @@ export default function HomeLibraryPager({ navigation, route }) {
 	const scrollRef = useRef(null);
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [libraryEditMode, setLibraryEditMode] = useState(false);
+	const [libraryInitialFilter, setLibraryInitialFilter] = useState(null);
 
 	const goToPage = useCallback((index) => {
 		scrollRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
 		setActiveIndex(index);
 	}, []);
+
+	const goToLibraryWithFilter = useCallback((categoryId) => {
+		setLibraryInitialFilter({ tagIds: [categoryId], datePreset: null, customRange: null });
+		goToPage(1);
+	}, [goToPage]);
 
 	// RecordScreen (and anywhere else) can ask to land on a specific page after navigating
 	// back here, e.g. navigation.navigate('Main', { initialPage: 1 }) to show Library right
@@ -76,13 +82,15 @@ export default function HomeLibraryPager({ navigation, route }) {
 				onMomentumScrollEnd={onMomentumScrollEnd}
 			>
 				<View style={{ width: SCREEN_WIDTH }}>
-					<TodayScreen navigation={navigation} />
+					<TodayScreen navigation={navigation} onTagPress={goToLibraryWithFilter} />
 				</View>
 				<View style={{ width: SCREEN_WIDTH }}>
 					<LibraryScreen 
 						navigation={navigation} 
 						isEditMode={libraryEditMode}
 						onEditModeChange={setLibraryEditMode}
+						initialFilter={libraryInitialFilter}
+						onFilterConsumed={() => setLibraryInitialFilter(null)}
 					/>
 				</View>
 			</ScrollView>

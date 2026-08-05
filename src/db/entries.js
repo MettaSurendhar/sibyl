@@ -160,6 +160,62 @@ export async function syncWithFolder(folderUri, onProgress) {
 }
 
 // Returns entries with their segments and category joined, grouped-ready (sorted newest first)
+export async function searchEntries(query) {
+	const db = await getDb();
+	const q = `%${query}%`;
+	const entries = await db.getAllAsync(
+		`
+    SELECT e.*, c.name as categoryName, c.color as categoryColor, c.icon as categoryIcon
+    FROM entries e
+    LEFT JOIN categories c ON c.id = e.categoryId
+    WHERE e.title LIKE ? OR e.transcript LIKE ?
+    ORDER BY e.updatedAt DESC
+  `,
+		[q, q]
+	);
+	const segments = await db.getAllAsync('SELECT * FROM segments ORDER BY orderIndex ASC');
+	const segByEntry = {};
+	for (const s of segments) {
+		if (!segByEntry[s.entryId]) segByEntry[s.entryId] = [];
+		segByEntry[s.entryId].push(s);
+	}
+	return entries.map((e) => ({
+		...e,
+		segments: segByEntry[e.id] || [],
+	}));
+}
+
+export async function getAnalyticsSummary() {
+	const db = await getDb();
+	
+	// Total duration and entry count
+	const summaryRow = await db.getFirstAsync(
+		'SELECT SUM(totalDurationMs) as totalTime, COUNT(*) as totalEntries FROM entries'
+	);
+	
+	const totalTime = summaryRow?.totalTime || 0;
+	const totalEntries = summaryRow?.totalEntries || 0;
+	const avgEntryLength = totalEntries > 0 ? Math.round(totalTime / totalEntries) : 0;
+
+	// Time of day (Morning 5-12, Afternoon 12-17, Evening 17-21, Night 21-5)
+	const timeOfDay = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+	
+	const rows = await db.getAllAsync(`
+		SELECT strftime('%H', datetime(createdAt / 1000, 'unixepoch', 'localtime')) as hour 
+		FROM entries
+	`);
+	
+	for (const r of rows) {
+		const h = parseInt(r.hour, 10);
+		if (h >= 5 && h < 12) timeOfDay.morning++;
+		else if (h >= 12 && h < 17) timeOfDay.afternoon++;
+		else if (h >= 17 && h < 21) timeOfDay.evening++;
+		else timeOfDay.night++;
+	}
+
+	return { totalTime, totalEntries, avgEntryLength, timeOfDay };
+}
+
 export async function listEntries() {
 	const db = await getDb();
 	const entries = await db.getAllAsync(`

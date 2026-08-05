@@ -21,6 +21,7 @@ import CategoriesScreen from './src/screens/CategoriesScreen';
 import TrimScreen from './src/screens/TrimScreen';
 import MergeScreen from './src/screens/MergeScreen';
 import AppendScreen from './src/screens/AppendScreen';
+import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import SettingsHomeScreen from './src/screens/settings/SettingsHomeScreen';
 import RecordingSettingsScreen from './src/screens/settings/RecordingSettingsScreen';
 import NamingTagsSettingsScreen from './src/screens/settings/NamingTagsSettingsScreen';
@@ -106,6 +107,10 @@ function Root() {
 				<Stack.Screen
 					name='Append'
 					component={AppendScreen}
+				/>
+				<Stack.Screen
+					name='Analytics'
+					component={AnalyticsScreen}
 				/>
 			</Stack.Navigator>
 		</NavigationContainer>

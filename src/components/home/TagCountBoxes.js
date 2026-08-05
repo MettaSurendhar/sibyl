@@ -1,17 +1,19 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Text from '../../theme/Text';
 import { useTheme } from '../../theme/ThemeContext';
 
-export default function TagCountBoxes({ tags }) {
+export default function TagCountBoxes({ tags, onTagPress }) {
 	const { theme } = useTheme();
 	if (!tags.length) return null;
 
 	return (
 		<View style={styles.grid}>
 			{tags.map((tag) => (
-				<View
+				<TouchableOpacity
 					key={tag.id ?? 'untagged'}
+					onPress={() => onTagPress && onTagPress(tag.id)}
+					activeOpacity={0.7}
 					style={[
 						styles.box,
 						{
@@ -21,17 +23,28 @@ export default function TagCountBoxes({ tags }) {
 						},
 					]}
 				>
-					<View style={styles.countRow}>
-						<Text style={[styles.count, { color: theme.text }]}>{tag.count}</Text>
-						<Text style={styles.icon}>{tag.icon}</Text>
-					</View>
-					<Text
-						style={[styles.name, { color: theme.textMuted }]}
-						numberOfLines={1}
-					>
-						{tag.name}
-					</Text>
-				</View>
+					{tag.count === 0 ? (
+						<>
+							<Text style={styles.icon}>{tag.icon}</Text>
+							<Text style={[styles.emptyText, { color: theme.textMuted }]} numberOfLines={2}>
+								Start your first {tag.name.toLowerCase()}
+							</Text>
+						</>
+					) : (
+						<>
+							<View style={styles.countRow}>
+								<Text style={[styles.count, { color: theme.text }]}>{tag.count}</Text>
+								<Text style={styles.icon}>{tag.icon}</Text>
+							</View>
+							<Text
+								style={[styles.name, { color: theme.textMuted }]}
+								numberOfLines={1}
+							>
+								{tag.name}
+							</Text>
+						</>
+					)}
+				</TouchableOpacity>
 			))}
 		</View>
 	);
@@ -62,5 +75,13 @@ const styles = StyleSheet.create({
 	},
 	count: { fontSize: 34, fontWeight: '800' },
 	icon: { fontSize: 24 },
-	name: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+	name: { fontSize: 12, fontWeight: '600' },
+	emptyText: {
+		fontSize: 11,
+		fontWeight: '500',
+		textAlign: 'center',
+		marginTop: 6,
+		fontStyle: 'italic',
+		paddingHorizontal: 4,
+	}
 });
