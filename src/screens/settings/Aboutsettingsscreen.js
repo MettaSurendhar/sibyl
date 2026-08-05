@@ -47,6 +47,27 @@ export default function AboutSettingsScreen({ navigation }) {
 					</Text>
 				</SettingsSection>
 
+				<SettingsSection title='Audio Format'>
+					<Text style={{ color: theme.text, fontWeight: '600', marginBottom: 6 }}>
+						AAC / M4A (.m4a)
+					</Text>
+					<Text style={{ color: theme.textMuted, lineHeight: 22, marginBottom: 12 }}>
+						Sibyl records all audio in AAC format, stored in an M4A container. This is the only format natively supported by Android's built-in recording hardware, so there is no format choice — it's what your device's microphone produces directly.
+					</Text>
+					<Text style={{ color: theme.accent, fontWeight: '600', marginBottom: 4 }}>
+						✓ Advantages
+					</Text>
+					<Text style={{ color: theme.textMuted, lineHeight: 22, marginBottom: 12 }}>
+						{`• Excellent audio quality at small file sizes (lossy but near-lossless at high bitrates)\n• Universally supported — plays natively on Android, iOS, Windows, macOS, and all major media apps\n• Fast to record and save — no post-processing needed\n• Ideal for voice: optimised for speech frequencies`}
+					</Text>
+					<Text style={{ color: theme.textMuted, fontWeight: '600', marginBottom: 4 }}>
+						✗ Trade-offs
+					</Text>
+					<Text style={{ color: theme.textMuted, lineHeight: 22 }}>
+						{`• Lossy compression — original audio waveform is not preserved bit-for-bit (imperceptible for voice journaling)\n• Not editable in some older audio workstations that only accept WAV/MP3`}
+					</Text>
+				</SettingsSection>
+
 				<SettingsSection title='Legal'>
 					<TouchableOpacity 
 						style={[styles.optionRow, { borderColor: theme.border }]}

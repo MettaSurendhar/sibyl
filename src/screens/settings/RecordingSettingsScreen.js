@@ -16,8 +16,6 @@ import { SettingsSection } from '../../components/SettingsNavRow';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoPopover from '../../components/InfoPopover';
 import {
-	getPrefs,
-	setPrefs,
 	getRecordingsFolderUri,
 	setRecordingsFolderUri,
 	getTranscriptFolderUri,
@@ -30,17 +28,10 @@ import {
 } from '../../utils/externalFolder';
 import { backfillRecordingsToFolder } from '../../db/entries';
 
-const FORMATS = [
-	{ key: 'aac', label: 'AAC (.m4a) — recommended, native quality' },
-	{ key: 'wav', label: 'WAV — uncompressed, larger files' },
-	{ key: 'mp3', label: 'MP3 — requires the optional ffmpeg module' },
-];
-
 export default function RecordingSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
 	const insets = useSafeAreaInsets();
-	const [prefs, setPrefsState] = useState({ recordingFormat: 'aac' });
 	const [recordingsFolderUri, setRecordingsFolderUriState] = useState(null);
 	const [transcriptFolderUri, setTranscriptFolderUriState] = useState(null);
 	const [backfillModalVisible, setBackfillModalVisible] = useState(false);
@@ -51,15 +42,9 @@ export default function RecordingSettingsScreen({ navigation }) {
 	});
 
 	useEffect(() => {
-		getPrefs().then(setPrefsState);
 		getRecordingsFolderUri().then(setRecordingsFolderUriState);
 		getTranscriptFolderUri().then(setTranscriptFolderUriState);
 	}, []);
-
-	async function chooseFormat(key) {
-		const updated = await setPrefs({ recordingFormat: key });
-		setPrefsState(updated);
-	}
 
 	async function chooseRecordingsFolder() {
 		if (!isExternalFolderSupported()) {
@@ -139,35 +124,6 @@ export default function RecordingSettingsScreen({ navigation }) {
 				title='Recording'
 				onBack={() => navigation.goBack()}
 			/>
-
-			<SettingsSection title='Recording format'>
-				{FORMATS.map((f) => (
-					<TouchableOpacity
-						key={f.key}
-						style={[
-							styles.optionRow,
-							{
-								borderColor: theme.border,
-								backgroundColor:
-									prefs.recordingFormat === f.key
-										? theme.surfaceAlt
-										: 'transparent',
-							},
-						]}
-						onPress={() => chooseFormat(f.key)}
-					>
-						<Feather
-							name={prefs.recordingFormat === f.key ? 'check-circle' : 'circle'}
-							size={18}
-							color={
-								prefs.recordingFormat === f.key ? theme.accent : theme.textMuted
-							}
-							style={{ marginRight: 12 }}
-						/>
-						<Text style={{ color: theme.text, flex: 1 }}>{f.label}</Text>
-					</TouchableOpacity>
-				))}
-			</SettingsSection>
 
 			<SettingsSection
 				title='Recordings saving folder'
@@ -319,13 +275,5 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		paddingVertical: 14,
 		paddingHorizontal: 14,
-	},
-	optionRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderRadius: 12,
-		padding: 12,
-		marginBottom: 8,
 	},
 });
