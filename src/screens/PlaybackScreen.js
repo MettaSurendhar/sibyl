@@ -269,7 +269,35 @@ export default function PlaybackScreen({ route, navigation }) {
 
 			const friendlyFolder = (uri) => {
 				if (!uri) return 'Not set';
-				// Strip content:// or file:// scheme for readability
+
+				// Android SAF content URI format:
+				// content://com.android.externalstorage.documents/tree/<volumeId>%3A<path>
+				// or the decoded /tree/<volumeId>:<path>
+				// We want to turn this into "Internal Storage/path" or "SD Card/path"
+				try {
+					// Extract the document ID from /tree/... part
+					const treeMatch = uri.match(/\/tree\/([^/]+)/);
+					if (treeMatch) {
+						// URL-decode the extracted segment (e.g. %3A → :)
+						const decoded = decodeURIComponent(treeMatch[1]);
+						// Split on first colon: [volumeId, ...pathParts]
+						const colonIdx = decoded.indexOf(':');
+						if (colonIdx !== -1) {
+							const volumeId = decoded.substring(0, colonIdx);
+							const folderPath = decoded.substring(colonIdx + 1);
+							const volumeLabel = volumeId.toLowerCase() === 'primary'
+								? 'Internal Storage'
+								: 'SD Card';
+							return folderPath
+								? `${volumeLabel}/${folderPath}`
+								: volumeLabel;
+						}
+					}
+				} catch {
+					// Fall through to simple strip below
+				}
+
+				// Fallback: strip the scheme + authority
 				return uri.replace(/^(content|file):\/\/[^/]*/, '');
 			};
 
