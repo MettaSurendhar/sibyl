@@ -216,6 +216,20 @@ export async function getAnalyticsSummary() {
 	return { totalTime, totalEntries, avgEntryLength, timeOfDay };
 }
 
+/**
+ * Saves the transcription text and status for an entry.
+ * @param {string} entryId
+ * @param {string} text - the transcribed text
+ * @param {'done'|'error'|'none'} status
+ */
+export async function saveTranscript(entryId, text, status = 'done') {
+	const db = await getDb();
+	await db.runAsync(
+		`UPDATE entries SET transcript = ?, transcriptStatus = ?, updatedAt = ? WHERE id = ?`,
+		[text, status, Date.now(), entryId]
+	);
+}
+
 export async function listEntries() {
 	const db = await getDb();
 	const entries = await db.getAllAsync(`

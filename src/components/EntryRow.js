@@ -54,6 +54,16 @@ export default function EntryRow({
 							? fullDateTimeLabel(entry.updatedAt)
 							: timeLabel(entry.updatedAt)}
 					</Text>
+					{entry.transcript ? (
+						<Text style={[styles.transcriptSnippet, { color: theme.textMuted }]} numberOfLines={1}>
+							"{entry.transcript}"
+						</Text>
+					) : entry.transcriptStatus === 'processing' ? (
+						<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+							<Feather name="loader" size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
+							<Text style={{ fontSize: 12, color: theme.textMuted, fontStyle: 'italic' }}>Transcribing...</Text>
+						</View>
+					) : null}
 				</View>
 
 				<Text style={[styles.duration, { color: theme.textMuted }]}>
@@ -115,19 +125,29 @@ export default function EntryRow({
 const styles = StyleSheet.create({
 	row: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 10 },
 	topLine: { flexDirection: 'row', alignItems: 'center' },
-	checkboxWrap: { marginLeft: 14 },
 	title: { fontSize: 16, fontWeight: '600' },
-	subtitle: { fontSize: 13, marginTop: 2 },
-	duration: { fontSize: 13, marginLeft: 10 },
+	subtitle: { fontSize: 12, marginTop: 4 },
+	transcriptSnippet: { fontSize: 13, marginTop: 4, fontStyle: 'italic' },
+	duration: { fontSize: 13, fontWeight: '600', marginRight: 14, minWidth: 40, textAlign: 'right' },
 	playBtn: {
 		width: 36,
 		height: 36,
 		borderRadius: 18,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginLeft: 12,
 	},
-	miniPlayer: { marginTop: 4 },
+	checkboxWrap: {
+		width: 36,
+		height: 36,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	miniPlayer: {
+		paddingTop: 14,
+		marginTop: 8,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderColor: 'rgba(150,150,150,0.2)',
+	},
 	miniTimeRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',

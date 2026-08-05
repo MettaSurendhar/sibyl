@@ -5,6 +5,8 @@ import {
 	ScrollView,
 	StyleSheet,
 	Platform,
+	TextInput,
+	Switch,
 } from 'react-native';
 import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,10 +18,13 @@ import { SettingsSection } from '../../components/SettingsNavRow';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoPopover from '../../components/InfoPopover';
 import {
-	getRecordingsFolderUri,
 	setRecordingsFolderUri,
 	getTranscriptFolderUri,
 	setTranscriptFolderUri,
+	getGroqApiKey,
+	setGroqApiKey,
+	getPrefs,
+	setPrefs,
 } from '../../utils/settingsStore';
 import {
 	pickFolder,
@@ -41,11 +46,25 @@ export default function RecordingSettingsScreen({ navigation }) {
 		total: 0,
 		phase: ''
 	});
+	const [groqKey, setGroqKeyState] = useState('');
+	const [autoTranscribe, setAutoTranscribe] = useState(false);
 
 	useEffect(() => {
 		getRecordingsFolderUri().then(setRecordingsFolderUriState);
 		getTranscriptFolderUri().then(setTranscriptFolderUriState);
+		getGroqApiKey().then((k) => setGroqKeyState(k || ''));
+		getPrefs().then((p) => setAutoTranscribe(p.autoTranscribe || false));
 	}, []);
+
+	async function handleGroqKeyChange(val) {
+		setGroqKeyState(val);
+		await setGroqApiKey(val);
+	}
+
+	async function handleAutoTranscribeChange(val) {
+		setAutoTranscribe(val);
+		await setPrefs({ autoTranscribe: val });
+	}
 
 	async function chooseRecordingsFolder() {
 		if (!isExternalFolderSupported()) {
@@ -252,6 +271,47 @@ export default function RecordingSettingsScreen({ navigation }) {
 				)}
 			</SettingsSection>
 
+			<SettingsSection
+				title='Auto-Transcription (Groq Whisper)'
+				right={
+					<InfoPopover title='Groq Transcription'>
+						{`• Generates text from your audio automatically when you save a recording.\n• Requires a free Groq API key.\n• Uses the whisper-large-v3-turbo model for incredibly fast and accurate transcription.\n• Transcripts are stored locally and are searchable in the Library.`}
+					</InfoPopover>
+				}
+			>
+				<View style={{ marginBottom: 16 }}>
+					<Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8 }}>
+						Groq API Key
+					</Text>
+					<TextInput
+						value={groqKey}
+						onChangeText={handleGroqKeyChange}
+						placeholder="gsk_..."
+						placeholderTextColor={theme.textMuted}
+						secureTextEntry
+						style={[
+							styles.input,
+							{ borderColor: theme.border, color: theme.text, backgroundColor: theme.surfaceAlt }
+						]}
+					/>
+				</View>
+				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+					<Text style={{ color: theme.text, fontSize: 15, fontWeight: '500' }}>
+						Auto-transcribe new recordings
+					</Text>
+					<Switch
+						value={autoTranscribe}
+						onValueChange={handleAutoTranscribeChange}
+						disabled={!groqKey}
+					/>
+				</View>
+				{!groqKey && (
+					<Text style={{ color: theme.accent, fontSize: 12, marginTop: 8 }}>
+						Enter an API key to enable auto-transcription.
+					</Text>
+				)}
+			</SettingsSection>
+
 			<ConfirmModal
 				visible={syncModalVisible}
 				title='Sync with folder?'
@@ -275,4 +335,11 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		paddingHorizontal: 14,
 	},
+	input: {
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+		fontSize: 15,
+	}
 });

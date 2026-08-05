@@ -22,13 +22,15 @@ import {
 	previewUntaggedName,
 	totalEntryCount,
 } from '../db/categories';
-import { createEntry } from '../db/entries';
+import { createEntry, saveTranscript } from '../db/entries';
 import {
 	getRecordingsFolderUri,
 	getFolderHintDismissed,
 	setFolderHintDismissed,
+	getPrefs,
 } from '../utils/settingsStore';
 import { isExternalFolderSupported } from '../utils/externalFolder';
+import { transcribeAudio } from '../utils/transcribe';
 import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -168,13 +170,29 @@ export default function RecordScreen({ navigation }) {
 			const suggested = await nextUntaggedName();
 			title = name || suggested;
 		}
-		await createEntry({
+		const id = await createEntry({
 			title,
 			categoryId,
 			uri: result.uri,
 			durationMs: result.durationMs,
 			waveform: result.waveform,
 		});
+		
+		// Fire-and-forget background transcription
+		getPrefs().then(async (prefs) => {
+			if (prefs.autoTranscribe) {
+				await saveTranscript(id, null, 'processing');
+				const res = await transcribeAudio(result.uri);
+				if (res.error) {
+					await saveTranscript(id, res.error, 'error');
+				} else if (res.text) {
+					await saveTranscript(id, res.text, 'done');
+				} else {
+					await saveTranscript(id, null, 'error');
+				}
+			}
+		});
+
 		setSheetVisible(false);
 		setSamples([]);
 		setElapsedMs(0);

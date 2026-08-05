@@ -26,6 +26,10 @@ const DEFAULT_PREFS = {
 	streakDays: 14,
 	// Global app font family
 	appFont: 'lora',
+	// Personalized greeting name
+	userName: '',
+	// Auto-transcribe new recordings via Groq Whisper after saving
+	autoTranscribe: false,
 };
 
 export async function getPrefs() {
