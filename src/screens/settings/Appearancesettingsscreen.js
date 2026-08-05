@@ -4,6 +4,7 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	StyleSheet,
+	TextInput,
 } from 'react-native';
 import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,10 +37,12 @@ export default function AppearanceSettingsScreen({ navigation }) {
 	const { theme, themeKey, setThemeKey, appFont, setAppFont } = useTheme();
 	const insets = useSafeAreaInsets();
 	const [streakDays, setStreakDays] = useState(14);
+	const [userName, setUserName] = useState('');
 
 	useEffect(() => {
 		getPrefs().then((p) => {
 			if (p.streakDays) setStreakDays(p.streakDays);
+			if (p.userName) setUserName(p.userName);
 		});
 	}, []);
 
@@ -48,15 +51,42 @@ export default function AppearanceSettingsScreen({ navigation }) {
 		await setPrefs({ streakDays: val });
 	}
 
+	async function updateUserName(val) {
+		setUserName(val);
+		await setPrefs({ userName: val });
+	}
+
 	return (
 		<ScrollView
 			style={{ flex: 1, backgroundColor: theme.bg }}
 			contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16 }}
 		>
 			<SettingsHeader
-				title='Appearance'
+				title='Appearance & Personal'
 				onBack={() => navigation.goBack()}
 			/>
+
+			<SettingsSection title='Personalization'>
+				<View style={{ marginBottom: 12 }}>
+					<Text style={{ color: theme.textMuted, fontSize: 14, marginBottom: 8 }}>
+						What should Sibyl call you?
+					</Text>
+					<TextInput
+						style={[
+							styles.input,
+							{
+								backgroundColor: theme.surfaceAlt,
+								borderColor: theme.border,
+								color: theme.text,
+							},
+						]}
+						value={userName}
+						onChangeText={updateUserName}
+						placeholder="e.g. Alex"
+						placeholderTextColor={theme.textMuted}
+					/>
+				</View>
+			</SettingsSection>
 
 			<SettingsSection title='Theme'>
 				{themeList.map((t) => (
@@ -131,6 +161,13 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		padding: 12,
 		marginBottom: 8,
+	},
+	input: {
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		fontSize: 16,
 	},
 	swatchPill: {
 		flexDirection: 'row',

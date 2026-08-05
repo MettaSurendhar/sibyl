@@ -5,6 +5,7 @@ import { Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold } from 
 import { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold } from '@expo-google-fonts/nunito';
+import { DancingScript_400Regular, DancingScript_500Medium, DancingScript_600SemiBold, DancingScript_700Bold } from '@expo-google-fonts/dancing-script';
 
 // Font loaded globally via src/theme/Text component
 import { NavigationContainer } from '@react-navigation/native';
@@ -124,6 +125,7 @@ export default function App() {
 		Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
 		Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
 		Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold,
+		DancingScript_400Regular, DancingScript_500Medium, DancingScript_600SemiBold, DancingScript_700Bold
 	});
 
 	if (!fontsLoaded) return null;
