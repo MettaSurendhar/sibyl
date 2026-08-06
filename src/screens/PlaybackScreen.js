@@ -898,8 +898,10 @@ export default function PlaybackScreen({ route, navigation }) {
 								styles.transcribeBtn,
 								{
 									backgroundColor: failed ? theme.surfaceAlt : theme.accent,
-									opacity: transcribing ? 0.7 : 1,
+									opacity: transcribing ? 0.8 : 1,
+
 								},
+
 							]}
 						>
 							{transcribing && progressPercent > 0 && (
@@ -909,11 +911,12 @@ export default function PlaybackScreen({ route, navigation }) {
 										left: 0, top: 0, bottom: 0,
 										width: `${progressPercent}%`,
 										backgroundColor: 'rgba(255,255,255,0.25)',
+
 									}}
 								/>
 							)}
 							{transcribing ? (
-								<ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+								<ActivityIndicator size="small" color={theme.text} style={{ marginRight: 8 }} />
 							) : (
 								<Feather
 									name={
@@ -924,14 +927,14 @@ export default function PlaybackScreen({ route, navigation }) {
 												: 'file-text'
 									}
 									size={18}
-									color={failed ? theme.text : '#fff'}
+									color={failed ? theme.text : theme.accentDeep}
 									style={{ marginRight: 8 }}
 								/>
 							)}
 							<View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
 								<Text
 									style={{
-										color: failed ? theme.text : '#fff',
+										color: (transcribing || failed) ? theme.text : theme.accentDeep,
 										fontWeight: '700',
 										fontSize: 15,
 									}}
