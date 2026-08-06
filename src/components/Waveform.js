@@ -9,6 +9,19 @@ const MAX_BARS = 60;
 // We downsample to this many bars; each bar represents a chunk of real samples.
 const MAX_RENDER_BARS = 800;
 
+// Generates a natural-looking dB value for a given sample index using layered sine waves.
+// Used as a fallback for imported audio that has no real waveform data.
+// Produces bars between -40 and -5 dB — tall and visually rich like a music spectrum.
+function dummyDbForIndex(i) {
+  const t = i * 0.05;
+  const combined =
+    Math.sin(t * 1.0) * 12 +
+    Math.sin(t * 2.7 + 1.2) * 8 +
+    Math.sin(t * 7.3 + 0.6) * 5 +
+    Math.sin(t * 13.1 + 2.1) * 3;
+  return Math.max(-40, Math.min(-5, -20 + combined * 0.55));
+}
+
 function formatMs(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
@@ -123,8 +136,8 @@ export function ScrollingPlaybackTrack({
   const visibleBars = [];
   for (let i = Math.floor(visibleStart); i <= Math.ceil(visibleEnd); i++) {
     if (i >= 0 && i < totalSamples) {
-      // Implicitly pad with silence (-60) if the waveform array is shorter than totalDurationMs
-      const db = i < waveform.length ? waveform[i] : -60;
+      // Use real waveform data if available, otherwise generate dummy pattern on-the-fly
+      const db = i < waveform.length ? waveform[i] : dummyDbForIndex(i);
       visibleBars.push({ index: i, db });
     }
   }
@@ -164,9 +177,10 @@ export function ScrollingPlaybackTrack({
                 left: index * slotWidth + (gap / 2),
                 width: barWidth,
                 height: h,
-                top: (waveHeight - h) / 2, // vertically center the bar
+                top: (waveHeight - h) / 2,
                 borderRadius: barWidth / 2,
                 backgroundColor: played ? color : mutedColor,
+                opacity: played ? 1 : 0.5,
               }}
             />
           );

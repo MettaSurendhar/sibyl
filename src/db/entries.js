@@ -37,12 +37,24 @@ async function mirrorToExternalFolder(uri, title) {
 	}
 }
 
-function generateDummyWaveform() {
+// Generates a dummy waveform covering the given duration (or 60s default).
+// Uses layered sine frequencies to mimic the tall, dense, music-spectrum bar look.
+// Each sample maps to 100ms, so durationMs / 100 samples are generated.
+function generateDummyWaveform(durationMs = 60000) {
+	const sampleCount = Math.max(200, Math.ceil(durationMs / 100));
 	const waveform = [];
-	for (let i = 0; i < 200; i++) {
-		// A gentle varying pattern between -30dB and -10dB
-		const val = -20 + Math.sin(i * 0.2) * 10;
-		waveform.push(val);
+	for (let i = 0; i < sampleCount; i++) {
+		// Layer multiple sine waves at different speeds and amplitudes
+		// to create natural-looking varied bar heights (-40 to -5 dB range)
+		const t = i * 0.05;
+		const base     = Math.sin(t * 1.0) * 12;        // slow broad shape
+		const mid      = Math.sin(t * 2.7 + 1.2) * 8;  // medium bumps
+		const fast     = Math.sin(t * 7.3 + 0.6) * 5;  // fast fine variation
+		const faster   = Math.sin(t * 13.1 + 2.1) * 3; // high-freq shimmer
+		const combined = base + mid + fast + faster;     // -28..+28 range
+		// Map to dB: center at -20, span from ~-40 to ~-5
+		const db = -20 + combined * 0.55;
+		waveform.push(Math.max(-45, Math.min(-5, db)));
 	}
 	return waveform;
 }
@@ -200,7 +212,7 @@ export async function syncWithFolder(folderUri, onProgress) {
 
 				// Write to DB using the real source timestamps from manifest
 				const entryId = newId('ent');
-				const waveform = JSON.stringify(generateDummyWaveform());
+				const waveform = JSON.stringify(generateDummyWaveform(durationMs));
 
 				await db.runAsync(
 					'INSERT INTO entries (id, title, createdAt, updatedAt, totalDurationMs, waveform) VALUES (?, ?, ?, ?, ?, ?)',
