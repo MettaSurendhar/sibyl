@@ -357,12 +357,12 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 							setEditMode(false);
 							setSelectedIds([]);
 						}}
-						style={styles.headerBtn}
+						style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 					>
 						<Feather
 							name='x'
-							size={22}
-							color={theme.text}
+							size={20}
+							color={theme.textMuted}
 						/>
 					</TouchableOpacity>
 				) : (
@@ -404,7 +404,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='search'
 									size={20}
-									color={searchOpen ? theme.accent : theme.teal}
+									color={searchOpen ? theme.accent : theme.textMuted}
 								/>
 							</TouchableOpacity>
 							<TouchableOpacity
@@ -414,7 +414,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='filter'
 									size={20}
-									color={activeFilterCount ? theme.accent : theme.teal}
+									color={activeFilterCount ? theme.accent : theme.textMuted}
 								/>
 								{activeFilterCount > 0 && (
 									<View
@@ -436,7 +436,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='more-vertical'
 									size={20}
-									color={theme.teal}
+									color={theme.textMuted}
 								/>
 							</TouchableOpacity>
 						</>

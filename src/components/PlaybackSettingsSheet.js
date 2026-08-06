@@ -15,7 +15,7 @@ export default function PlaybackSettingsSheet({ visible, speed, skipSilence, onC
         <View style={[styles.sheet, { backgroundColor: theme.surface }]}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.text }]}>Playback settings</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]} onPress={onClose}>
               <Feather name="x" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
@@ -54,6 +54,13 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
   radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },

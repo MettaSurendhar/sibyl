@@ -139,7 +139,7 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 					/>
 				</View>
 			</SettingsSection>
-			
+
 			<SettingsSection
 				title='Transcription Language'
 				right={
@@ -163,8 +163,8 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 									}
 								]}
 							>
-								<Text style={{ 
-									color: isSelected ? '#fff' : theme.text,
+								<Text style={{
+									color: isSelected ? theme.accentDeep : theme.text,
 									fontWeight: isSelected ? '600' : '400',
 									fontSize: 14,
 								}}>

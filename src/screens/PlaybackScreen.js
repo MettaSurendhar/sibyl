@@ -734,12 +734,12 @@ export default function PlaybackScreen({ route, navigation }) {
 					<View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
 						<TouchableOpacity
 							onPress={() => navigation.goBack()}
-							style={styles.iconBtn}
+							style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 						>
 							<Feather
 								name='arrow-left'
 								size={22}
-								color={theme.text}
+								color={theme.textMuted}
 							/>
 						</TouchableOpacity>
 						<Text
@@ -750,12 +750,12 @@ export default function PlaybackScreen({ route, navigation }) {
 						</Text>
 						<TouchableOpacity
 							onPress={() => setMenuOpen((v) => !v)}
-							style={styles.iconBtn}
+							style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 						>
 							<Feather
 								name='more-vertical'
 								size={20}
-								color={theme.text}
+								color={theme.textMuted}
 							/>
 						</TouchableOpacity>
 					</View>
@@ -790,8 +790,8 @@ export default function PlaybackScreen({ route, navigation }) {
 								maximumValue={entry.totalDurationMs || 1}
 								value={positionMs}
 								minimumTrackTintColor={theme.accent}
-								maximumTrackTintColor={theme.waveformMuted}
-								thumbTintColor={theme.accent}
+								maximumTrackTintColor={theme.teal}
+								thumbTintColor={theme.text}
 								onSlidingComplete={seekTo}
 							/>
 							<View style={styles.timeRow}>
@@ -808,7 +808,7 @@ export default function PlaybackScreen({ route, navigation }) {
 							<View style={styles.transportRow}>
 								<TouchableOpacity
 									onPress={() => setSettingsOpen(true)}
-									style={styles.iconBtn}
+									style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 								>
 									<Feather
 										name='sliders'
@@ -852,11 +852,11 @@ export default function PlaybackScreen({ route, navigation }) {
 								</TouchableOpacity>
 								<TouchableOpacity
 									onPress={() => setEditMenuOpen((v) => !v)}
-									style={styles.iconBtn}
+									style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 								>
 									<Feather
 										name='scissors'
-										size={20}
+										size={22}
 										color={theme.text}
 									/>
 								</TouchableOpacity>
@@ -870,12 +870,12 @@ export default function PlaybackScreen({ route, navigation }) {
 					<View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
 						<TouchableOpacity
 							onPress={goToPlaybackPage}
-							style={styles.iconBtn}
+							style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 						>
 							<Feather
 								name='arrow-left'
 								size={22}
-								color={theme.text}
+								color={theme.textMuted}
 							/>
 						</TouchableOpacity>
 						<Text
@@ -1064,8 +1064,15 @@ export default function PlaybackScreen({ route, navigation }) {
 						<View style={styles.detailsHandleBar} />
 						<View style={styles.detailsHeaderRow}>
 							<Text style={[styles.detailsTitle, { color: theme.text }]}>Details</Text>
-							<TouchableOpacity onPress={() => setDetailsSheetOpen(false)}>
-								<Feather name='x' size={20} color={theme.textMuted} />
+							<TouchableOpacity
+								style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
+								onPress={() => setDetailsSheetOpen(false)}
+							>
+								<Feather
+									name='x'
+									size={20}
+									color={theme.textMuted}
+								/>
 							</TouchableOpacity>
 						</View>
 						<ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
@@ -1149,6 +1156,13 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 	iconBtn: { padding: 8 },
+	headerBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	dropdown: {
 		position: 'absolute',
 		right: 16,

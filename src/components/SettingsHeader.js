@@ -8,11 +8,11 @@ export default function SettingsHeader({ title, onBack }) {
 	const { theme } = useTheme();
 	return (
 		<View style={styles.topBar}>
-			<TouchableOpacity onPress={onBack}>
+			<TouchableOpacity style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]} onPress={onBack}>
 				<Feather
 					name='arrow-left'
 					size={22}
-					color={theme.text}
+					color={theme.textMuted}
 				/>
 			</TouchableOpacity>
 			<Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
@@ -27,6 +27,13 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		marginBottom: 20,
+	},
+	headerBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	headerTitle: { fontSize: 20, fontWeight: '700' },
 });

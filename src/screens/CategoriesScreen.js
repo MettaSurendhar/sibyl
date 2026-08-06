@@ -33,7 +33,7 @@ export default function CategoriesScreen({ navigation }) {
 
   const refresh = useCallback(async () => {
     let cats = await listCategories();
-    
+
     // Quick migration: if an icon is not a valid feather icon (contains emojis), set to default
     let migrated = false;
     for (const c of cats) {
@@ -45,7 +45,7 @@ export default function CategoriesScreen({ navigation }) {
     if (migrated) {
       cats = await listCategories();
     }
-    
+
     setCategories(cats);
     const countPairs = await Promise.all(cats.map(async (c) => [c.id, await getCategoryEntryCount(c.id)]));
     setCounts(Object.fromEntries(countPairs));
@@ -138,7 +138,7 @@ export default function CategoriesScreen({ navigation }) {
           onSubmitEditing={handleAdd}
         />
         <TouchableOpacity onPress={handleAdd} style={[styles.addBtn, { backgroundColor: theme.accent }]}>
-          <Feather name="plus" size={18} color="#fff" />
+          <Feather name="plus" size={18} color={theme.accentDeep} />
         </TouchableOpacity>
       </View>
 
@@ -219,7 +219,7 @@ export default function CategoriesScreen({ navigation }) {
                             style={{ width: '50%', padding: 6, alignItems: 'center' }}
                           >
                             <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: editIcon === iconName ? 2 : 1, borderColor: editIcon === iconName ? theme.accent : theme.border, backgroundColor: editIcon === iconName ? `${theme.accent}22` : 'transparent' }}>
-                               <Feather name={iconName} size={16} color={theme.text} />
+                              <Feather name={iconName} size={16} color={theme.text} />
                             </View>
                           </TouchableOpacity>
                         ))}
