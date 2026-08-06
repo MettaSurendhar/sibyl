@@ -7,7 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { formatDuration, timeLabel, fullDateTimeLabel } from '../utils/format';
 import { UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';
 
-export default function EntryRow({
+export default React.memo(function EntryRow({
 	entry,
 	isActiveHere,
 	isPlayingHere,
@@ -92,12 +92,12 @@ export default function EntryRow({
 				) : (
 					<TouchableOpacity
 						onPress={() => onPressPlay(entry)}
-						style={[styles.playBtn, { backgroundColor: theme.surfaceAlt }]}
+						style={[styles.playBtn, { backgroundColor: isActiveHere ? theme.accent : theme.surfaceAlt }]}
 					>
 						<Feather
 							name={isPlayingHere ? 'pause' : 'play'}
 							size={16}
-							color={theme.text}
+							color={isActiveHere ? theme.accentDeep : theme.text}
 							style={isPlayingHere ? undefined : { marginLeft: 2 }}
 						/>
 					</TouchableOpacity>
@@ -107,13 +107,13 @@ export default function EntryRow({
 			{isActiveHere && (
 				<View style={styles.miniPlayer}>
 					<Slider
-						style={{ width: '100%', height: 28 }}
+						style={{ width: '100%', height: 40 }}
 						minimumValue={0}
 						maximumValue={entry.totalDurationMs || 1}
 						value={playbackPositionMs}
-						minimumTrackTintColor={entry.categoryColor || theme.accent}
-						maximumTrackTintColor={theme.waveformMuted}
-						thumbTintColor={entry.categoryColor || theme.accent}
+						minimumTrackTintColor={theme.accent}
+						maximumTrackTintColor={theme.teal}
+						thumbTintColor="#FFFFFF"
 						onSlidingComplete={(v) => onSeek(entry, v)}
 					/>
 					<View style={styles.miniTimeRow}>
@@ -128,7 +128,7 @@ export default function EntryRow({
 			)}
 		</TouchableOpacity>
 	);
-}
+});
 
 const styles = StyleSheet.create({
 	row: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 10 },

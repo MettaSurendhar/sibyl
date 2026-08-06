@@ -93,14 +93,14 @@ export default function PlaybackScreen({ route, navigation }) {
 		const e = await getEntry(entryId);
 		setEntry(e);
 		entryRef.current = e;
-		
+
 		// Resume transcription spinner if it was left running
 		if (e.transcriptStatus === 'processing') setTranscribing(true);
 
 		const prefs = await getPrefs();
 		const langMap = { auto: 'Auto', en: 'English', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', kn: 'Kannada', hi: 'Hindi' };
 		setTranscriptionLanguage(langMap[prefs.transcriptionLanguage || 'auto'] || prefs.transcriptionLanguage);
-		
+
 		return e;
 	}, [entryId]);
 
@@ -505,11 +505,36 @@ export default function PlaybackScreen({ route, navigation }) {
 		(noApiKey || !!transcribeError || entry.transcriptStatus === 'error');
 
 	let transcribeLabel = 'Transcribe';
+	let progressPercent = 0;
+	let timeRemainingLabel = '';
 	if (transcribing) {
+		transcribeLabel = 'Transcribing...';
+
+		// 5 minutes per chunk (300000 ms)
+		const estimatedTotalChunks = Math.max(1, Math.ceil((entry?.durationMs || 0) / 300000));
+
 		if (transcribeProgress && transcribeProgress.total > 1) {
-			transcribeLabel = `Uploading ${transcribeProgress.done}/${transcribeProgress.total} chunks…`;
+			// Upload phase (scales 15% -> 100%)
+			progressPercent = 15 + ((transcribeProgress.done / transcribeProgress.total) * 85);
+
+			const remainingChunks = transcribeProgress.total - transcribeProgress.done;
+			if (remainingChunks > 0) {
+				const secs = remainingChunks * 20; // ~20s per chunk for upload/transcribe
+				const mins = Math.floor(secs / 60);
+				const remSecs = secs % 60;
+				timeRemainingLabel = mins > 0 ? `(~${mins}m ${remSecs}s left)` : `(~${remSecs}s left)`;
+			}
 		} else {
-			transcribeLabel = 'Transcribing…';
+			// Chunking phase (ffmpeg processing)
+			progressPercent = estimatedTotalChunks > 1 ? 15 : 0;
+
+			if (estimatedTotalChunks > 1) {
+				// Estimate ~25s total per chunk (5s for chunking + 20s for API)
+				const secs = estimatedTotalChunks * 25;
+				const mins = Math.floor(secs / 60);
+				const remSecs = secs % 60;
+				timeRemainingLabel = mins > 0 ? `(~${mins}m ${remSecs}s left)` : `(~${remSecs}s left)`;
+			}
 		}
 	}
 	else if (transcribed) transcribeLabel = 'Transcribed';
@@ -811,7 +836,7 @@ export default function PlaybackScreen({ route, navigation }) {
 									<Feather
 										name={isPlaying ? 'pause' : 'play'}
 										size={26}
-										color='#fff'
+										color={theme.accentDeep}
 										style={isPlaying ? undefined : { marginLeft: 3 }}
 									/>
 								</TouchableOpacity>
@@ -877,6 +902,16 @@ export default function PlaybackScreen({ route, navigation }) {
 								},
 							]}
 						>
+							{transcribing && progressPercent > 0 && (
+								<View
+									style={{
+										position: 'absolute',
+										left: 0, top: 0, bottom: 0,
+										width: `${progressPercent}%`,
+										backgroundColor: 'rgba(255,255,255,0.25)',
+									}}
+								/>
+							)}
 							{transcribing ? (
 								<ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
 							) : (
@@ -893,17 +928,24 @@ export default function PlaybackScreen({ route, navigation }) {
 									style={{ marginRight: 8 }}
 								/>
 							)}
-							<Text
-								style={{
-									color: failed ? theme.text : '#fff',
-									fontWeight: '700',
-									fontSize: 15,
-								}}
-							>
-								{transcribing ? 'Transcribing...' : transcribeLabel}
-							</Text>
+							<View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+								<Text
+									style={{
+										color: failed ? theme.text : '#fff',
+										fontWeight: '700',
+										fontSize: 15,
+									}}
+								>
+									{transcribeLabel}
+								</Text>
+								{!!timeRemainingLabel && (
+									<Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' }}>
+										{timeRemainingLabel}
+									</Text>
+								)}
+							</View>
 						</TouchableOpacity>
-						
+
 						<TouchableOpacity onPress={() => { setMenuOpen(false); navigation.navigate('TranscriptionSettings'); }} style={{ marginBottom: 32 }}>
 							<Text style={{ color: theme.textMuted, fontSize: 13, textDecorationLine: 'underline', textAlign: 'center', marginTop: 16 }}>
 								Change audio language ({transcriptionLanguage})
@@ -1166,6 +1208,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		borderRadius: 14,
 		marginBottom: 14,
+		overflow: 'hidden',
 	},
 	warningBox: {
 		padding: 14,

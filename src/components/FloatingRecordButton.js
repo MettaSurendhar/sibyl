@@ -162,7 +162,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 					<Feather
 						name='mic'
 						size={26}
-						color='#fff'
+						color={theme.accentDeep}
 					/>
 				</View>
 			</Animated.View>

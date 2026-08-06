@@ -169,10 +169,10 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 	);
 	const activeFilterCount = filter.tagIds.length + (filter.datePreset ? 1 : 0);
 
-	async function togglePlay(entry) {
+	const togglePlayRef = useRef();
+	togglePlayRef.current = async (entry) => {
 		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 		if (activeEntryId === entry.id) {
-			// same entry: toggle play/pause, keep the mini-player visible either way
 			if (isPlaying) {
 				await playerRef.current?.pause();
 				setIsPlaying(false);
@@ -182,7 +182,6 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			}
 			return;
 		}
-		// different entry: swap the active player
 		await playerRef.current?.unload();
 		const player = createPlayer({
 			segments: entry.segments,
@@ -195,20 +194,32 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 		setActiveEntryId(entry.id);
 		setPlaybackPos(0);
 		setIsPlaying(true);
-		await player.play();
-	}
+		setTimeout(async () => {
+			await player.play();
+		}, 0);
+	};
 
-	async function seekEntry(entry, ms) {
-		if (activeEntryId !== entry.id) return;
+	const handlePressPlay = useCallback((entry) => togglePlayRef.current?.(entry), []);
+
+	const seekEntry = useCallback(async (entry, ms) => {
 		await playerRef.current?.seek(ms);
 		setPlaybackPos(ms);
-	}
+	}, []);
 
-	function toggleSelect(id) {
+	const toggleSelect = useCallback((id) => {
 		setSelectedIds((prev) =>
 			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
 		);
-	}
+	}, []);
+
+	const handlePressOpen = useCallback((e) => {
+		navigation.navigate('Playback', { entryId: e.id });
+	}, [navigation]);
+
+	const handleLongPress = useCallback((e) => {
+		setEditMode(true);
+		setSelectedIds([e.id]);
+	}, [setEditMode]);
 
 	function selectAll() {
 		setSelectedIds(
@@ -356,7 +367,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 					</TouchableOpacity>
 				) : (
 					<View>
-						<Text style={[styles.headerTitle, { color: theme.text }]}>
+						<Text style={[styles.headerTitle, { color: theme.accent, textTransform: 'uppercase' }]}>
 							Library
 						</Text>
 						<Text style={[styles.headerCount, { color: theme.textMuted }]}>
@@ -393,7 +404,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='search'
 									size={20}
-									color={searchOpen ? theme.accent : theme.text}
+									color={searchOpen ? theme.accent : theme.teal}
 								/>
 							</TouchableOpacity>
 							<TouchableOpacity
@@ -403,7 +414,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='filter'
 									size={20}
-									color={activeFilterCount ? theme.accent : theme.text}
+									color={activeFilterCount ? theme.accent : theme.teal}
 								/>
 								{activeFilterCount > 0 && (
 									<View
@@ -425,7 +436,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								<Feather
 									name='more-vertical'
 									size={20}
-									color={theme.text}
+									color={theme.teal}
 								/>
 							</TouchableOpacity>
 						</>
@@ -535,20 +546,15 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 						entry={item}
 						isActiveHere={activeEntryId === item.id}
 						isPlayingHere={activeEntryId === item.id && isPlaying}
-						playbackPositionMs={playbackPos}
+						playbackPositionMs={activeEntryId === item.id ? playbackPos : 0}
 						editMode={editMode}
 						selected={selectedIds.includes(item.id)}
 						onToggleSelect={toggleSelect}
-						onPressPlay={togglePlay}
-						onPressOpen={(e) =>
-							navigation.navigate('Playback', { entryId: e.id })
-						}
+						onPressPlay={handlePressPlay}
+						onPressOpen={handlePressOpen}
 						onSeek={seekEntry}
 						showAbsoluteDate={editMode}
-						onLongPress={(e) => {
-							setEditMode(true);
-							setSelectedIds([e.id]);
-						}}
+						onLongPress={handleLongPress}
 					/>
 				)}
 				ListEmptyComponent={
