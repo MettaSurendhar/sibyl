@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, TouchableWithoutFeedback, Animated, StyleSheet } from 'react-native';
 import Text from '../../theme/Text';
 import { useTheme } from '../../theme/ThemeContext';
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { iconForCategory } from '../../utils/tagColors';
 
 function AnimatedTagBox({ tag, onTagPress }) {
@@ -65,11 +65,11 @@ function AnimatedTagBox({ tag, onTagPress }) {
 					},
 				]}
 			>
-				<Feather 
-					name={iconForCategory(tag)} 
-					size={18} 
-					color={theme.accent} 
-					style={{ position: 'absolute', top: 12, left: 12 }} 
+				<MaterialCommunityIcons
+					name={iconForCategory(tag)}
+					size={18}
+					color={theme.accent}
+					style={{ position: 'absolute', top: 12, left: 12 }}
 				/>
 				{tag.count === 0 ? (
 					<Text style={[styles.emptyText, { color: theme.textMuted, marginTop: 16 }]} numberOfLines={2}>

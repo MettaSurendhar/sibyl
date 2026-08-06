@@ -2,10 +2,10 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Text from '../theme/Text';
 import Slider from '@react-native-community/slider';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { formatDuration, timeLabel, fullDateTimeLabel } from '../utils/format';
-import { UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';
+import { UNTAGGED_COLOR, UNTAGGED_ICON, iconForCategory } from '../utils/tagColors';
 
 export default React.memo(function EntryRow({
 	entry,
@@ -50,7 +50,7 @@ export default React.memo(function EntryRow({
 					</Text>
 					<View style={{ marginTop: 4 }}>
 						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Feather name={entry.categoryIcon || UNTAGGED_ICON} size={12} color={theme.textMuted} />
+							<MaterialCommunityIcons name={iconForCategory({ icon: entry.categoryIcon || UNTAGGED_ICON })} size={12} color={theme.textMuted} />
 							<Text style={[styles.subtitle, { color: theme.textMuted, marginTop: 0, marginLeft: 4 }]}>
 								{entry.categoryName || 'Untagged'}
 								{!editMode && ` · ${showAbsoluteDate ? fullDateTimeLabel(entry.updatedAt) : timeLabel(entry.updatedAt)}`}

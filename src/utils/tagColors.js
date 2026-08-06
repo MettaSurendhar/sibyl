@@ -22,57 +22,59 @@ export const TAG_COLOR_PALETTE = [
 	'#95A5A6', '#BDC3C7', '#7F8C8D', '#AAB7B8',
 ];
 
-// A reasonably broad, journal-relevant set to start the emoji picker with. Manage Tags
-// (Phase 3) can still allow picking any system emoji beyond this list - these are just the
-// quick-pick defaults.
+// A curated set of solid/filled icon names from MaterialCommunityIcons.
+// These are the icons shown in the tag icon picker. All names must be valid
+// MaterialCommunityIcons identifiers (rendered with <MaterialCommunityIcons name={...} />).
 export const TAG_ICON_PRESETS = [
 	'book',
-	'message-circle',
-	'mic',
-	'edit-3',
-	'zap',
-	'moon',
-	'sun',
+	'message',
+	'microphone',
+	'pencil',
+	'lightning-bolt',
+	'moon-waning-crescent',
+	'white-balance-sunny',
 	'cloud',
 	'target',
 	'heart',
-	'cpu',
+	'head-cog',
 	'feather',
 	'headphones',
-	'map-pin',
+	'map-marker',
 	'star',
 	'calendar',
-	'activity',
-	'smile',
-	'award',
+	'chart-line',
+	'emoticon',
+	'trophy',
 	'coffee',
 	'music',
-	'film',
+	'filmstrip',
 	'camera',
-	'globe',
+	'earth',
 	'home',
 	'briefcase',
-	'dollar-sign',
+	'currency-usd',
 	'trending-up',
-	'users',
-	'user',
+	'account-group',
+	'account',
 	'flag',
 	'bell',
-	'shopping-bag',
+	'shopping',
 	'layers',
-	'code',
-	'pen-tool',
+	'code-braces',
+	'fountain-pen',
 	'anchor',
 	'compass',
 	'clock',
 	'eye',
 	'gift',
 	'radio',
-	'slack',
 	'tag',
-	'thumbs-up',
+	'thumb-up',
 	'umbrella',
-	'wind',
+	'weather-windy',
+	'run',
+	'dumbbell',
+	'food-apple',
 ];
 
 // Untagged is deliberately neutral/grey so it never gets confused with an actual tag's
@@ -100,8 +102,38 @@ export function colorForCategory(category) {
 	return category?.color || UNTAGGED_COLOR;
 }
 
+// Map legacy Feather icon names (stored in old DB rows) to their MaterialCommunityIcons
+// equivalents. This lets existing tags render correctly without a DB migration.
+const FEATHER_TO_MDI = {
+	'message-circle': 'message',
+	'mic':            'microphone',
+	'edit-3':         'pencil',
+	'zap':            'lightning-bolt',
+	'moon':           'moon-waning-crescent',
+	'sun':            'white-balance-sunny',
+	'cpu':            'head-cog',
+	'map-pin':        'map-marker',
+	'activity':       'chart-line',
+	'smile':          'emoticon',
+	'award':          'trophy',
+	'film':           'filmstrip',
+	'globe':          'earth',
+	'dollar-sign':    'currency-usd',
+	'users':          'account-group',
+	'user':           'account',
+	'shopping-bag':   'shopping',
+	'code':           'code-braces',
+	'pen-tool':       'fountain-pen',
+	'thumbs-up':      'thumb-up',
+	'wind':           'weather-windy',
+	'slack':          'tag',
+	'trending-up':    'trending-up',
+	'edit-2':         'pencil',
+};
+
 export function iconForCategory(category) {
 	const icon = category?.icon;
-	if (icon && /^[a-z\-]+$/.test(icon)) return icon;
-	return DEFAULT_TAG_ICON;
+	if (!icon || !/^[a-z0-9\-]+$/.test(icon)) return DEFAULT_TAG_ICON;
+	// Transparently remap any old Feather name to its MDI equivalent
+	return FEATHER_TO_MDI[icon] ?? icon;
 }

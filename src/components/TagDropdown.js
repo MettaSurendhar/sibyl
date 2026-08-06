@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal } from 'react-native';
 import Text from '../theme/Text';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { iconForCategory, colorForCategory, UNTAGGED_COLOR, UNTAGGED_ICON } from '../utils/tagColors';
 
@@ -45,7 +45,7 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
           {value ? (
             <>
               <View style={[styles.dot, { backgroundColor: colorForCategory(value) }]} />
-              <Feather name={iconForCategory(value)} size={16} color={theme.text} style={{ marginRight: 8 }} />
+              <MaterialCommunityIcons name={iconForCategory(value)} size={18} color={theme.text} style={{ marginRight: 8 }} />
               <Text style={{ color: theme.text, fontSize: 15 }}>{value.name}</Text>
             </>
           ) : (
@@ -87,7 +87,7 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => select(item)} style={styles.option}>
                   <View style={[styles.dot, { backgroundColor: colorForCategory(item) }]} />
-                  <Feather name={iconForCategory(item)} size={16} color={theme.text} style={{ marginRight: 8 }} />
+                  <MaterialCommunityIcons name={iconForCategory(item)} size={18} color={theme.text} style={{ marginRight: 8 }} />
                   <Text style={{ color: theme.text }}>{item.name}</Text>
                 </TouchableOpacity>
               )}

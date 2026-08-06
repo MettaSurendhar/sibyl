@@ -4,6 +4,7 @@ import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import {
   listCategories,
@@ -121,8 +122,15 @@ export default function CategoriesScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Feather name="arrow-left" size={22} color={theme.text} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
+        >
+          <Feather
+            name='arrow-left'
+            size={22}
+            color={theme.textMuted}
+          />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Tags</Text>
         <View style={{ width: 22 }} />
@@ -149,7 +157,7 @@ export default function CategoriesScreen({ navigation }) {
         renderItem={({ item }) => (
           <View style={[styles.catRow, { borderColor: theme.border }]}>
             <View style={[styles.swatch, { backgroundColor: item.color }]} />
-            <Feather name={iconForCategory(item)} size={16} color={theme.text} style={{ marginRight: 10 }} />
+            <MaterialCommunityIcons name={iconForCategory(item)} size={18} color={theme.text} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>{item.name}</Text>
               <Text style={{ color: theme.textMuted, fontSize: 12 }}>
@@ -206,7 +214,7 @@ export default function CategoriesScreen({ navigation }) {
                 <View style={{ flex: 1, zIndex: editMode === 'icon' ? 20 : 1 }}>
                   <Text style={[styles.label, { color: theme.textMuted }]}>Icon</Text>
                   <TouchableOpacity onPress={() => setEditMode(editMode === 'icon' ? 'main' : 'icon')} style={[styles.modalInput, { alignItems: 'center', justifyContent: 'center', borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
-                    <Feather name={editIcon} size={20} color={theme.text} />
+                    <MaterialCommunityIcons name={iconForCategory({ icon: editIcon })} size={20} color={theme.text} />
                   </TouchableOpacity>
 
                   {editMode === 'icon' && (
@@ -219,7 +227,7 @@ export default function CategoriesScreen({ navigation }) {
                             style={{ width: '50%', padding: 6, alignItems: 'center' }}
                           >
                             <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: editIcon === iconName ? 2 : 1, borderColor: editIcon === iconName ? theme.accent : theme.border, backgroundColor: editIcon === iconName ? `${theme.accent}22` : 'transparent' }}>
-                              <Feather name={iconName} size={16} color={theme.text} />
+                              <MaterialCommunityIcons name={iconName} size={18} color={theme.text} />
                             </View>
                           </TouchableOpacity>
                         ))}
@@ -244,7 +252,7 @@ export default function CategoriesScreen({ navigation }) {
               <Text style={[styles.label, { color: theme.textMuted, marginTop: 14, marginBottom: 8 }]}>Preview</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12, padding: 12, backgroundColor: theme.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, backgroundColor: `${editColor}22`, borderColor: editColor, borderWidth: 1 }}>
-                  <Feather name={editIcon} size={12} color={editColor} style={{ marginRight: 4 }} />
+                  <MaterialCommunityIcons name={iconForCategory({ icon: editIcon })} size={12} color={editColor} style={{ marginRight: 4 }} />
                   <Text style={{ color: editColor, fontSize: 12, fontWeight: '700' }}>{editName || 'Tag'}</Text>
                 </View>
                 <Text style={{ color: theme.text, fontSize: 13, flex: 1 }} numberOfLines={1}>
@@ -282,6 +290,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingBottom: 0 },
   headerTitle: { fontSize: 20, fontWeight: '700' },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   addRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 16 },
   input: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12 },
   addBtn: { width: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

@@ -138,9 +138,9 @@ export async function getPieBreakdown() {
     GROUP BY sourceType
   `);
 	const opMeta = {
-		trimmed: { name: 'Trimmed', color: '#E0C15C', icon: '✂️' },
-		merged: { name: 'Merged', color: '#6CC5E5', icon: '🔗' },
-		appended: { name: 'Appended', color: '#B87CE0', icon: '➕' },
+		trimmed: { name: 'Trimmed', color: '#E0C15C', icon: 'content-cut' },
+		merged: { name: 'Merged', color: '#6CC5E5', icon: 'link' },
+		appended: { name: 'Appended', color: '#B87CE0', icon: 'plus' },
 	};
 	const slices = [
 		...tagRows.map((r) => ({

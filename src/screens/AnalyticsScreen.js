@@ -124,8 +124,8 @@ export default function AnalyticsScreen({ navigation }) {
 	return (
 		<View style={[styles.container, { backgroundColor: theme.bg }]}>
 			<View style={[styles.topBar, { paddingTop: insets.top + 16, paddingHorizontal: 20 }]}>
-				<TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
-					<Feather name='arrow-left' size={24} color={theme.text} />
+				<TouchableOpacity onPress={() => navigation.goBack()} style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}>
+					<Feather name='arrow-left' size={22} color={theme.textMuted} />
 				</TouchableOpacity>
 				<Text style={[styles.headerTitle, { color: theme.text }]}>Analytics</Text>
 				<View style={{ width: 32 }} />
@@ -141,17 +141,17 @@ export default function AnalyticsScreen({ navigation }) {
 				{/* Analytics Summary Cards */}
 				<View style={styles.summaryGrid}>
 					<View style={[styles.summaryCard, { backgroundColor: theme.surfaceAlt }]}>
-						<Feather name='clock' size={16} color={theme.textMuted} style={{ marginBottom: 6 }} />
+						<Feather name='clock' size={16} color={theme.accentDeep} style={{ marginBottom: 6 }} />
 						<Text style={[styles.summaryValue, { color: theme.text }]}>{formatDuration(summary.totalTime)}</Text>
 						<Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Total Time</Text>
 					</View>
 					<View style={[styles.summaryCard, { backgroundColor: theme.surfaceAlt }]}>
-						<Feather name='activity' size={16} color={theme.textMuted} style={{ marginBottom: 6 }} />
+						<Feather name='activity' size={16} color={theme.accentDeep} style={{ marginBottom: 6 }} />
 						<Text style={[styles.summaryValue, { color: theme.text }]}>{formatDuration(summary.avgEntryLength)}</Text>
 						<Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Avg Length</Text>
 					</View>
 					<View style={[styles.summaryCard, { backgroundColor: theme.surfaceAlt }]}>
-						<Feather name='sun' size={16} color={theme.textMuted} style={{ marginBottom: 6 }} />
+						<Feather name='sun' size={16} color={theme.accentDeep} style={{ marginBottom: 6 }} />
 						<Text style={[styles.summaryValue, { color: theme.text }]}>{getBestTimeOfDay(summary.timeOfDay)}</Text>
 						<Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Peak Time</Text>
 					</View>
@@ -206,6 +206,7 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	headerTitle: { fontSize: 20, fontWeight: '700' },
+	headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 	summaryGrid: {
 		flexDirection: 'row',
 		paddingHorizontal: 16,

@@ -3,7 +3,8 @@ import { View, StyleSheet } from 'react-native';
 import Text from '../../theme/Text';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { iconForCategory } from '../../utils/tagColors';
 
 const SIZE = 170;
 const RADIUS = SIZE / 2;
@@ -56,7 +57,7 @@ export default function TagPieChart({ slices, width }) {
 	}
 
 	return (
-		<View style={styles.row}>
+		<View style={styles.container}>
 			<Svg
 				width={SIZE}
 				height={SIZE}
@@ -82,7 +83,7 @@ export default function TagPieChart({ slices, width }) {
 						style={styles.legendItem}
 					>
 						<View style={[styles.legendDot, { backgroundColor: a.color }]} />
-						<Feather name={a.icon} size={14} color={theme.text} style={{ marginRight: 6 }} />
+						<MaterialCommunityIcons name={iconForCategory(a)} size={14} color={theme.text} style={{ marginRight: 6 }} />
 						<Text
 							style={[styles.legendText, { color: theme.text }]}
 							numberOfLines={1}
@@ -97,9 +98,20 @@ export default function TagPieChart({ slices, width }) {
 }
 
 const styles = StyleSheet.create({
-	row: { flexDirection: 'row', alignItems: 'center' },
-	legend: { flex: 1, marginLeft: 16 },
-	legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+	container: { alignItems: 'center', width: '100%' },
+	legend: { 
+		flexDirection: 'row', 
+		flexWrap: 'wrap', 
+		marginTop: 20, 
+		width: '100%',
+		justifyContent: 'space-between'
+	},
+	legendItem: { 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		marginBottom: 10, 
+		width: '48%' 
+	},
 	legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
 	legendText: { fontSize: 12, flexShrink: 1 },
 });
