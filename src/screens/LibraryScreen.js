@@ -50,6 +50,11 @@ if (
 
 const EMPTY_FILTER = { tagIds: [], datePreset: null, customRange: null };
 
+// Enable LayoutAnimation on Android at module level
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+	UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 export default function LibraryScreen({ navigation, isEditMode, onEditModeChange, initialFilter, onFilterConsumed }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
@@ -125,16 +130,11 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 					setFilter(EMPTY_FILTER);
 					return true;
 				}
-				if (editMode) {
-					setEditMode(false);
-					setSelectedIds([]);
-					return true;
-				}
 				return false;
 			};
 			const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
 			return () => sub.remove();
-		}, [menuOpen, searchOpen, filter, editMode]),
+		}, [menuOpen, searchOpen, filter]),
 	);
 
 	const filtered = useMemo(() => {

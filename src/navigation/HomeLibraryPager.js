@@ -5,6 +5,7 @@ import {
 	TouchableOpacity,
 	Dimensions,
 	StyleSheet,
+	BackHandler,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -61,6 +62,20 @@ export default function HomeLibraryPager({ navigation, route }) {
 				navigation.setParams({ initialPage: undefined });
 			}
 		}, [route.params?.initialPage, goToPage, navigation]),
+	);
+
+	// Handle back press to exit library edit mode (libraryEditMode is owned here)
+	useFocusEffect(
+		useCallback(() => {
+			const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+				if (libraryEditMode) {
+					setLibraryEditMode(false);
+					return true;
+				}
+				return false;
+			});
+			return () => sub.remove();
+		}, [libraryEditMode]),
 	);
 
 	const onMomentumScrollEnd = useCallback((e) => {

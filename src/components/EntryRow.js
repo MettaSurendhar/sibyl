@@ -28,6 +28,7 @@ export default React.memo(function EntryRow({
 			activeOpacity={0.8}
 			onPress={() => (editMode ? onToggleSelect(entry.id) : onPressOpen(entry))}
 			onLongPress={() => !editMode && onLongPress && onLongPress(entry)}
+			delayLongPress={100}
 			style={[
 				styles.row,
 				{
