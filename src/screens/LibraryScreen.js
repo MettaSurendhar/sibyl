@@ -57,6 +57,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 	const [entries, setEntries] = useState([]);
 	const [categories, setCategories] = useState([]);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchMode, setSearchMode] = useState(null);
 	const [search, setSearch] = useState('');
 	const [filterOpen, setFilterOpen] = useState(false);
 	const [filter, setFilter] = useState(EMPTY_FILTER);
@@ -138,12 +139,16 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 
 	const filtered = useMemo(() => {
 		let list = entries;
-		if (search.trim()) {
+		if (search.trim() && searchMode) {
 			const q = search.toLowerCase();
-			list = list.filter((e) => 
-				e.title.toLowerCase().includes(q) || 
-				(e.transcript && e.transcript.toLowerCase().includes(q))
-			);
+			list = list.filter((e) => {
+				if (searchMode === 'record') {
+					return e.title.toLowerCase().includes(q);
+				} else if (searchMode === 'transcript') {
+					return e.transcript && e.transcript.toLowerCase().includes(q);
+				}
+				return true;
+			});
 		}
 		if (filter.tagIds.length) {
 			list = list.filter(
@@ -398,29 +403,33 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 					) : (
 						<>
 							<TouchableOpacity
-								onPress={() => setSearchOpen((v) => !v)}
-								style={[styles.headerBtn, { backgroundColor: searchOpen ? `${theme.accent}33` : theme.surfaceAlt }]}
+								onPress={() => {
+									setSearchOpen((v) => !v);
+									setSearch('');
+									setSearchMode(null);
+								}}
+								style={[styles.headerBtn, { backgroundColor: searchOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
 							>
 								<Feather
 									name='search'
 									size={20}
-									color={searchOpen ? theme.accent : theme.textMuted}
+									color={searchOpen ? theme.accentDeep : theme.textMuted}
 								/>
 							</TouchableOpacity>
 							<TouchableOpacity
 								onPress={() => setFilterOpen(true)}
-								style={[styles.headerBtn, { backgroundColor: activeFilterCount ? `${theme.accent}33` : theme.surfaceAlt }]}
+								style={[styles.headerBtn, { backgroundColor: activeFilterCount ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
 							>
 								<Feather
 									name='filter'
 									size={20}
-									color={activeFilterCount ? theme.accent : theme.textMuted}
+									color={activeFilterCount ? theme.accentDeep : theme.textMuted}
 								/>
 								{activeFilterCount > 0 && (
 									<View
 										style={[
 											styles.filterBadge,
-											{ backgroundColor: theme.accent },
+											{ backgroundColor: theme.accentDeep },
 										]}
 									>
 										<Text style={styles.filterBadgeText}>
@@ -431,12 +440,12 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 							</TouchableOpacity>
 							<TouchableOpacity
 								onPress={() => setMenuOpen((v) => !v)}
-								style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
+								style={[styles.headerBtn, { backgroundColor: menuOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
 							>
 								<Feather
 									name='more-vertical'
 									size={20}
-									color={theme.textMuted}
+									color={menuOpen ? theme.accentDeep : theme.textMuted}
 								/>
 							</TouchableOpacity>
 						</>
@@ -495,34 +504,55 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			)}
 
 			{!editMode && searchOpen && (
-				<View
-					style={[
-						styles.searchWrap,
-						{ backgroundColor: theme.surface, borderColor: theme.border },
-					]}
-				>
-					<Feather
-						name='search'
-						size={16}
-						color={theme.textMuted}
-						style={{ marginRight: 8 }}
-					/>
-					<TextInput
-						value={search}
-						onChangeText={setSearch}
-						autoFocus
-						placeholder='Search by name...'
-						placeholderTextColor={theme.textMuted}
-						style={[styles.searchInput, { color: theme.text }]}
-					/>
-					{search.length > 0 && (
-						<TouchableOpacity onPress={() => setSearch('')}>
+				<View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 }}>
+					<View style={{ flexDirection: 'row', gap: 10, marginBottom: searchMode ? 14 : 4 }}>
+						<TouchableOpacity
+							onPress={() => setSearchMode('record')}
+							style={[styles.searchModeBtn, { borderColor: theme.border, backgroundColor: searchMode === 'record' ? theme.accentDeep : theme.surface }]}
+						>
+							<Feather name="mic" size={14} color={searchMode === 'record' ? '#fff' : theme.text} style={{ marginRight: 6 }} />
+							<Text style={{ color: searchMode === 'record' ? '#fff' : theme.text, fontSize: 13, fontWeight: '600' }}>Record Names</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => setSearchMode('transcript')}
+							style={[styles.searchModeBtn, { borderColor: theme.border, backgroundColor: searchMode === 'transcript' ? theme.accentDeep : theme.surface }]}
+						>
+							<Feather name="file-text" size={14} color={searchMode === 'transcript' ? '#fff' : theme.text} style={{ marginRight: 6 }} />
+							<Text style={{ color: searchMode === 'transcript' ? '#fff' : theme.text, fontSize: 13, fontWeight: '600' }}>Transcriptions</Text>
+						</TouchableOpacity>
+					</View>
+
+					{searchMode && (
+						<View
+							style={[
+								styles.searchWrap,
+								{ backgroundColor: theme.surface, borderColor: theme.border, marginHorizontal: 0, marginTop: 0 },
+							]}
+						>
 							<Feather
-								name='x-circle'
+								name='search'
 								size={16}
 								color={theme.textMuted}
+								style={{ marginRight: 8 }}
 							/>
-						</TouchableOpacity>
+							<TextInput
+								value={search}
+								onChangeText={setSearch}
+								autoFocus
+								placeholder={searchMode === 'record' ? 'Search records...' : 'Search transcriptions...'}
+								placeholderTextColor={theme.textMuted}
+								style={[styles.searchInput, { color: theme.text }]}
+							/>
+							{search.length > 0 && (
+								<TouchableOpacity onPress={() => setSearch('')}>
+									<Feather
+										name='x-circle'
+										size={16}
+										color={theme.textMuted}
+									/>
+								</TouchableOpacity>
+							)}
+						</View>
 					)}
 				</View>
 			)}
@@ -752,6 +782,15 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingVertical: 12,
 		paddingHorizontal: 16,
+	},
+	searchModeBtn: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 8,
+		borderWidth: 1,
+		borderRadius: 12,
 	},
 	searchWrap: {
 		flexDirection: 'row',

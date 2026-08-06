@@ -46,7 +46,7 @@ export default function FilterSheet({ visible, categories, value, onChange, onCl
         <View style={[styles.sheet, { backgroundColor: theme.surface }]}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.text }]}>Filter</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={onClose} style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}>
               <Feather name="x" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
@@ -111,7 +111,7 @@ export default function FilterSheet({ visible, categories, value, onChange, onCl
               <Text style={{ color: theme.text, fontWeight: '600' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={clearAll} style={[styles.footerBtn, { backgroundColor: theme.accent }]}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Clear filters</Text>
+              <Text style={{ color: theme.accentDeep, fontWeight: '700' }}>Clear filters</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
