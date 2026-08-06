@@ -13,6 +13,8 @@ import * as FileSystem from 'expo-file-system';
 import { RECORDINGS_DIR, ensureRecordingsDir } from './recorder';
 
 const TIMEOUT_MS = 45000;
+// Compression of long audio can take many minutes on slow phones — give it 15 min max.
+const COMPRESS_TIMEOUT_MS = 15 * 60 * 1000;
 
 function toFfmpegPath(uri) {
   // ffmpeg-kit wants plain filesystem paths, not the file:// URI scheme Expo uses.
@@ -68,16 +70,29 @@ export async function concatFiles(inputUris) {
 }
 
 // Compresses an audio file to 16kHz mono 32kbps AAC (ideal for Whisper APIs) and splits it into
-// 1-hour chunks. This drastically reduces file size (~14MB/hour) and guarantees we never hit
-// the Groq 25MB per-request upload limit, even for huge files.
+// 5-minute chunks. This drastically reduces file size and guarantees we never hit Groq's
+// 25MB per-request upload limit or their strict duration-per-request limits on the free tier.
 export async function compressAndSplitForTranscription(inputUri) {
   // Use a dedicated folder for these temporary chunks to easily clean them up
   const chunkDir = `${FileSystem.cacheDirectory}transcribe_chunks_${Date.now()}/`;
   await FileSystem.makeDirectoryAsync(chunkDir, { intermediates: true });
   
-  // segment_time 3600 splits into 1 hour chunks
-  const command = `-y -i "${toFfmpegPath(inputUri)}" -vn -ac 1 -ar 16000 -c:a aac -b:a 32k -f segment -segment_time 3600 "${toFfmpegPath(chunkDir)}chunk_%03d.m4a"`;
-  await runFfmpeg(command, 'Compress and split');
+  // segment_time 300 splits into 5 minute chunks (safest for free tier APIs)
+  const command = `-y -i "${toFfmpegPath(inputUri)}" -vn -ac 1 -ar 16000 -c:a aac -b:a 32k -f segment -segment_time 300 "${toFfmpegPath(chunkDir)}chunk_%03d.m4a"`;
+
+  // Use a generous timeout: a 1-hour file at 60x speed takes ~60s; add buffer for slow devices.
+  const session = await new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Compress and split timed out after ${COMPRESS_TIMEOUT_MS / 60000} minutes`)),
+      COMPRESS_TIMEOUT_MS
+    );
+    FFmpegKit.execute(command).then((s) => { clearTimeout(timer); resolve(s); }).catch((e) => { clearTimeout(timer); reject(e); });
+  });
+  const returnCode = await session.getReturnCode();
+  if (!ReturnCode.isSuccess(returnCode)) {
+    const logs = await session.getAllLogsAsString().catch(() => '');
+    throw new Error(`Compress and split failed. ${logs?.slice(-300) || 'No ffmpeg log available.'}`);
+  }
   
   // ffmpeg creates chunk_000.m4a, chunk_001.m4a... Read the directory to get them all
   const files = await FileSystem.readDirectoryAsync(chunkDir);

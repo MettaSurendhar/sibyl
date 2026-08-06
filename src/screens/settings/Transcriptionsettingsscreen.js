@@ -21,10 +21,16 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 	const insets = useSafeAreaInsets();
 	const [apiKey, setApiKey] = useState('');
 	const [autoTranscribe, setAutoTranscribe] = useState(false);
+	const [transcriptionLanguage, setTranscriptionLanguage] = useState('auto');
+	const [transcriptionModel, setTranscriptionModel] = useState('whisper-large-v3-turbo');
 
 	useEffect(() => {
 		getGroqApiKey().then((k) => setApiKey(k || ''));
-		getPrefs().then((p) => setAutoTranscribe(p.autoTranscribe || false));
+		getPrefs().then((p) => {
+			setAutoTranscribe(p.autoTranscribe || false);
+			setTranscriptionLanguage(p.transcriptionLanguage || 'auto');
+			setTranscriptionModel(p.transcriptionModel || 'whisper-large-v3-turbo');
+		});
 	}, []);
 
 	async function saveApiKey(text) {
@@ -36,6 +42,31 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 		setAutoTranscribe(val);
 		await setPrefs({ autoTranscribe: val });
 	}
+
+	async function handleLanguageChange(code) {
+		setTranscriptionLanguage(code);
+		await setPrefs({ transcriptionLanguage: code });
+	}
+
+	async function handleModelChange(modelId) {
+		setTranscriptionModel(modelId);
+		await setPrefs({ transcriptionModel: modelId });
+	}
+
+	const LANGUAGES = [
+		{ code: 'auto', label: 'Auto-detect' },
+		{ code: 'en', label: 'English' },
+		{ code: 'ta', label: 'Tamil' },
+		{ code: 'te', label: 'Telugu' },
+		{ code: 'ml', label: 'Malayalam' },
+		{ code: 'kn', label: 'Kannada' },
+		{ code: 'hi', label: 'Hindi' },
+	];
+
+	const MODELS = [
+		{ id: 'whisper-large-v3-turbo', label: 'Fast (Turbo)', desc: 'Fastest + cheapest, good for English.' },
+		{ id: 'whisper-large-v3', label: 'Accurate (Large v3)', desc: 'Slower, but significantly more accurate for Indian languages.' },
+	];
 
 	return (
 		<ScrollView
@@ -97,6 +128,77 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 					/>
 				</View>
 			</SettingsSection>
+			
+			<SettingsSection
+				title='Transcription Language'
+				right={
+					<InfoPopover title='Force Language'>
+						{`Whisper usually auto-detects the language you are speaking.\n\nHowever, for some languages (like Tamil), if Auto-detect translates your speech into English instead of writing it in the native script, you can strictly enforce the language here.`}
+					</InfoPopover>
+				}
+			>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, paddingHorizontal: 20 }}>
+					{LANGUAGES.map((lang) => {
+						const isSelected = transcriptionLanguage === lang.code;
+						return (
+							<TouchableOpacity
+								key={lang.code}
+								onPress={() => handleLanguageChange(lang.code)}
+								style={[
+									styles.langChip,
+									{
+										backgroundColor: isSelected ? theme.accent : theme.surfaceAlt,
+										borderColor: isSelected ? theme.accent : theme.border,
+									}
+								]}
+							>
+								<Text style={{ 
+									color: isSelected ? '#fff' : theme.text,
+									fontWeight: isSelected ? '600' : '400',
+									fontSize: 14,
+								}}>
+									{lang.label}
+								</Text>
+							</TouchableOpacity>
+						);
+					})}
+					<View style={{ width: 40 }} />
+				</ScrollView>
+			</SettingsSection>
+
+			<SettingsSection
+				title='Whisper Model'
+				right={
+					<InfoPopover title='Whisper Models'>
+						{`whisper-large-v3-turbo is incredibly fast and uses minimal Groq free-tier quota.\n\nHowever, whisper-large-v3 is the full model and has significantly better accuracy for languages like Tamil and Telugu, at the cost of being slightly slower and using more hourly quota.`}
+					</InfoPopover>
+				}
+			>
+				{MODELS.map((model) => {
+					const isSelected = transcriptionModel === model.id;
+					return (
+						<TouchableOpacity
+							key={model.id}
+							onPress={() => handleModelChange(model.id)}
+							style={[
+								styles.modelCard,
+								{
+									backgroundColor: theme.surfaceAlt,
+									borderColor: isSelected ? theme.accent : theme.border,
+									borderWidth: isSelected ? 2 : 1,
+								}
+							]}
+						>
+							<Text style={{ color: theme.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
+								{model.label}
+							</Text>
+							<Text style={{ color: theme.textMuted, fontSize: 13 }}>
+								{model.desc}
+							</Text>
+						</TouchableOpacity>
+					);
+				})}
+			</SettingsSection>
 		</ScrollView>
 	);
 }
@@ -110,4 +212,16 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15 },
+	langChip: {
+		borderWidth: 1,
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		borderRadius: 20,
+		marginRight: 10,
+	},
+	modelCard: {
+		padding: 16,
+		borderRadius: 14,
+		marginBottom: 12,
+	}
 });

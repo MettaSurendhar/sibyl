@@ -1,9 +1,12 @@
 import * as FileSystem from 'expo-file-system';
 import { compressAndSplitForTranscription } from '../audio/ffmpegModule';
+import { getPrefs } from '../utils/settingsStore';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
-// whisper-large-v3-turbo: fastest + cheapest on Groq's free tier, plenty accurate for journaling.
-const MODEL = 'whisper-large-v3-turbo';
+// Default model — can be overridden per-transcription via user prefs (Settings → Transcription)
+const DEFAULT_MODEL = 'whisper-large-v3-turbo';
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Gap (in seconds) between one Whisper segment's end and the next one's start that counts as a
 // natural pause worth breaking into a new paragraph. Long enough to skip normal mid-sentence
@@ -19,8 +22,14 @@ const PARAGRAPH_GAP_SECONDS = 1.8;
 //  - compression_ratio: how compressible the text is - a repetitive loop ("Tours of Tours of
 //    Tours") compresses far better than real speech, so a high ratio flags that failure mode
 const NO_SPEECH_PROB_THRESHOLD = 0.6;
-const AVG_LOGPROB_THRESHOLD = -1.0;
-const COMPRESSION_RATIO_THRESHOLD = 2.4;
+// avg_logprob: English Whisper segments score around -0.3 to -0.8.
+// Non-English / Indian languages (Tamil, Telugu, etc.) score lower by default (-0.8 to -1.4)
+// because they're underrepresented in Whisper's training data — NOT because they're hallucinations.
+// Using -1.0 for everything silently drops ALL real Tamil content. Use a more lenient threshold.
+const AVG_LOGPROB_THRESHOLD = -1.5;
+// compression_ratio: Tamil morphology (agglutinative, lots of shared syllables) compresses
+// more aggressively than English even for normal speech. Raise threshold to avoid false positives.
+const COMPRESSION_RATIO_THRESHOLD = 2.8;
 
 // Whisper's ISO-639-1 language codes mapped to readable display names, for the Transcribe page's
 // "Language: English" line. Not exhaustive of every code Whisper can return, but covers the
@@ -121,66 +130,96 @@ function buildParagraphs(segments) {
 }
 
 // Transcribes a single chunk of audio (already guaranteed to be <25MB by ffmpeg chunking).
-async function transcribeSingleChunk(uri, apiKey) {
-	const form = new FormData();
-	form.append('file', {
-		uri,
-		name: 'audio.m4a',
-		type: 'audio/m4a',
-	});
-	form.append('model', MODEL);
-	form.append('response_format', 'verbose_json');
-	form.append('temperature', '0');
-	// Deliberately no `prompt` field here. Whisper's prompt isn't an instruction the model follows -
-	// it's treated as preceding transcript text the model continues from. An earlier version sent a
-	// descriptive prompt ("This is a personal voice journal entry...") and on quiet/low-signal audio
-	// Whisper echoed that prompt text back as invented speech instead of transcribing real audio.
-	// Do not reintroduce a descriptive/instructional prompt here for that reason.
+async function transcribeSingleChunk(uri, apiKey, languageCode, model) {
+	// Groq rate limits can be strict on the free tier (e.g. 20 requests per minute).
+	// With 5-minute chunks, we are well below RPM, but they may throttle fast sequential requests.
+	let attempt = 0;
+	const maxAttempts = 3;
 
-	const response = await fetch(GROQ_URL, {
-		method: 'POST',
-		headers: { Authorization: `Bearer ${apiKey}` },
-		body: form,
-	});
+	while (attempt < maxAttempts) {
+		attempt++;
 
-	if (!response.ok) {
-		const text = await response.text().catch(() => '');
-		if (response.status === 401) throw new Error('Invalid Groq API key.');
-		if (response.status === 429)
-			throw new Error('Groq rate limit hit — try again shortly.');
-		throw new Error(
-			`Transcription failed (${response.status}): ${text.slice(0, 150)}`,
-		);
+		// FormData MUST be rebuilt inside the loop — React Native's fetch consumes the body
+		// stream on the first attempt. Reusing the same form on retry sends an empty body,
+		// which causes Groq to return a confusing non-429 error.
+		const form = new FormData();
+		form.append('file', { uri, name: 'audio.m4a', type: 'audio/m4a' });
+		form.append('model', model || DEFAULT_MODEL);
+		form.append('response_format', 'verbose_json');
+		form.append('temperature', '0');
+		if (languageCode && languageCode !== 'auto') {
+			form.append('language', languageCode);
+		}
+		// Deliberately no `prompt` field here. Whisper's prompt isn't an instruction the model follows -
+		// it's treated as preceding transcript text the model continues from. An earlier version sent a
+		// descriptive prompt ("This is a personal voice journal entry...") and on quiet/low-signal audio
+		// Whisper echoed that prompt text back as invented speech instead of transcribing real audio.
+		// Do not reintroduce a descriptive/instructional prompt here for that reason.
+
+		const response = await fetch(GROQ_URL, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${apiKey}` },
+			body: form,
+		});
+
+		if (!response.ok) {
+			const text = await response.text().catch(() => '');
+			if (response.status === 401) throw new Error('Invalid Groq API key.');
+
+			if (response.status === 429 && attempt < maxAttempts) {
+				// Read the Retry-After header Groq sends — it tells us exactly how long to wait.
+				// If absent, default to 15 seconds. Cap at 120s so we never block forever.
+				const retryAfter = parseInt(response.headers.get('Retry-After') || '15', 10);
+				const waitMs = Math.min(retryAfter, 120) * 1000;
+				await delay(waitMs);
+				continue;
+			}
+
+			if (response.status === 429) {
+				throw new Error('Groq rate limit hit — you may have exceeded your free tier\'s hourly audio quota. Try again in an hour.');
+			}
+
+			throw new Error(`Transcription failed (${response.status}): ${text.slice(0, 150)}`);
+		}
+
+		const data = await response.json();
+		const text =
+			Array.isArray(data.segments) && data.segments.length
+				? buildParagraphs(data.segments)
+				: (data.text || '').trim();
+		return { text, language: data.language || '' };
 	}
-
-	const data = await response.json();
-	const text =
-		Array.isArray(data.segments) && data.segments.length
-			? buildParagraphs(data.segments)
-			: (data.text || '').trim();
-	return { text, language: data.language || '' };
 }
 
 // Transcribes a local audio file. Requires internet + a Groq API key (Settings screen).
 // Automatically compresses and chunks large files to fit within Groq's 25MB limits.
 // Returns { text, language }.
-export async function transcribeFile(uri, apiKey) {
+export async function transcribeFile(uri, apiKey, { onProgress } = {}) {
 	if (!apiKey) throw new Error('No Groq API key set. Add one in Settings.');
 
 	const info = await FileSystem.getInfoAsync(uri);
 	if (!info.exists) throw new Error('Audio file not found.');
 
-	// Compress to 16kHz 32kbps mono AAC and split into 1-hour chunks safely
+	// Compress to 16kHz 32kbps mono AAC and split into 5-min chunks
 	const { chunkUris, chunkDir } = await compressAndSplitForTranscription(uri);
+	
+	const prefs = await getPrefs();
+	const targetLanguage = prefs.transcriptionLanguage || 'auto';
+	const targetModel = prefs.transcriptionModel || DEFAULT_MODEL;
 	
 	try {
 		const parts = [];
 		let language = '';
+		const total = chunkUris.length;
 		
-		for (const chunkUri of chunkUris) {
-			const result = await transcribeSingleChunk(chunkUri, apiKey);
+		for (let i = 0; i < chunkUris.length; i++) {
+			onProgress && onProgress({ done: i, total });
+			// Small pause between chunks to avoid hitting Groq's requests-per-minute limit
+			if (i > 0) await delay(2000);
+			const result = await transcribeSingleChunk(chunkUris[i], apiKey, targetLanguage, targetModel);
 			if (result.text) parts.push(result.text);
 			if (!language && result.language) language = result.language;
+			onProgress && onProgress({ done: i + 1, total });
 		}
 		
 		return { text: parts.join('\n\n'), language };
@@ -190,16 +229,13 @@ export async function transcribeFile(uri, apiKey) {
 	}
 }
 
-// For multi-segment entries (legacy append model — new Trim/Merge/Append operations always
-// produce a single segment): transcribes each segment file separately (keeps requests small and
-// within the free tier's per-file limits) and joins the paragraphed text from each file with a
-// paragraph break — the boundary between files is itself a natural break.
+// For multi-segment entries: transcribes each segment file separately and joins the results.
 // Returns { text, language } (language taken from the first file that reports one).
-export async function transcribeSegments(segments, apiKey) {
+export async function transcribeSegments(segments, apiKey, { onProgress } = {}) {
 	const parts = [];
 	let language = '';
 	for (const seg of segments) {
-		const result = await transcribeFile(seg.uri, apiKey);
+		const result = await transcribeFile(seg.uri, apiKey, { onProgress });
 		if (result.text) parts.push(result.text);
 		if (!language && result.language) language = result.language;
 	}

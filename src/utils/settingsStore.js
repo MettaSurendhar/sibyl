@@ -30,6 +30,13 @@ const DEFAULT_PREFS = {
 	userName: '',
 	// Auto-transcribe new recordings via Groq Whisper after saving
 	autoTranscribe: false,
+	// Optional language code (e.g. 'ta', 'en') to force Whisper to transcribe in that language
+	// instead of attempting auto-detection (which sometimes defaults to English translation)
+	transcriptionLanguage: 'auto',
+	// Whisper model to use for transcription.
+	// 'whisper-large-v3-turbo' = fast + cheap, good for English
+	// 'whisper-large-v3' = slower but more accurate, better for Indian languages
+	transcriptionModel: 'whisper-large-v3-turbo',
 };
 
 export async function getPrefs() {

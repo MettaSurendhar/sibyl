@@ -8,6 +8,7 @@ import {
 	Modal,
 	BackHandler,
 	useWindowDimensions,
+	ActivityIndicator,
 } from 'react-native';
 import Text from '../theme/Text';
 import Slider from '@react-native-community/slider';
@@ -41,6 +42,7 @@ import {
 	getRecordingsFolderUri,
 	getTranscriptFolderUri,
 	setTranscriptFolderUri,
+	getPrefs,
 } from '../utils/settingsStore';
 import {
 	pickFolder,
@@ -73,6 +75,8 @@ export default function PlaybackScreen({ route, navigation }) {
 	const [tagSheetOpen, setTagSheetOpen] = useState(false);
 	const [transcribing, setTranscribing] = useState(false);
 	const [transcribeError, setTranscribeError] = useState('');
+	const [transcribeProgress, setTranscribeProgress] = useState(null); // { done, total }
+	const [transcriptionLanguage, setTranscriptionLanguage] = useState('Auto');
 	const [page, setPage] = useState(0); // 0 = Playback, 1 = Transcribe
 	const [renamePromptVisible, setRenamePromptVisible] = useState(false);
 	const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -89,6 +93,14 @@ export default function PlaybackScreen({ route, navigation }) {
 		const e = await getEntry(entryId);
 		setEntry(e);
 		entryRef.current = e;
+		
+		// Resume transcription spinner if it was left running
+		if (e.transcriptStatus === 'processing') setTranscribing(true);
+
+		const prefs = await getPrefs();
+		const langMap = { auto: 'Auto', en: 'English', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', kn: 'Kannada', hi: 'Hindi' };
+		setTranscriptionLanguage(langMap[prefs.transcriptionLanguage || 'auto'] || prefs.transcriptionLanguage);
+		
 		return e;
 	}, [entryId]);
 
@@ -374,21 +386,25 @@ export default function PlaybackScreen({ route, navigation }) {
 	// transcript/error state instead of two independent copies.
 	async function startTranscribe() {
 		setTranscribeError('');
+		setTranscribeProgress(null);
 		const apiKey = await getGroqApiKey();
 		if (!apiKey) {
 			setTranscribeError(NO_API_KEY);
 			return;
 		}
 		setTranscribing(true);
-		await setTranscriptStatus(entry.id, 'pending');
+		await setTranscriptStatus(entry.id, 'processing');
 		try {
 			const { text, language } = await transcribeSegments(
 				entry.segments,
 				apiKey,
+				{ onProgress: (p) => setTranscribeProgress(p) },
 			);
+			setTranscribeProgress(null);
 			await setTranscript(entry.id, text, language);
 			await load();
 		} catch (e) {
+			setTranscribeProgress(null);
 			setTranscribeError(e.message);
 			await setTranscriptStatus(entry.id, 'error');
 			await load();
@@ -489,7 +505,13 @@ export default function PlaybackScreen({ route, navigation }) {
 		(noApiKey || !!transcribeError || entry.transcriptStatus === 'error');
 
 	let transcribeLabel = 'Transcribe';
-	if (transcribing) transcribeLabel = 'Transcribing…';
+	if (transcribing) {
+		if (transcribeProgress && transcribeProgress.total > 1) {
+			transcribeLabel = `Uploading ${transcribeProgress.done}/${transcribeProgress.total} chunks…`;
+		} else {
+			transcribeLabel = 'Transcribing…';
+		}
+	}
 	else if (transcribed) transcribeLabel = 'Transcribed';
 	else if (failed) transcribeLabel = 'Not transcribed';
 
@@ -855,18 +877,22 @@ export default function PlaybackScreen({ route, navigation }) {
 								},
 							]}
 						>
-							<Feather
-								name={
-									transcribed
-										? 'check-circle'
-										: failed
-											? 'alert-circle'
-											: 'file-text'
-								}
-								size={18}
-								color={failed ? theme.text : '#fff'}
-								style={{ marginRight: 8 }}
-							/>
+							{transcribing ? (
+								<ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+							) : (
+								<Feather
+									name={
+										transcribed
+											? 'check-circle'
+											: failed
+												? 'alert-circle'
+												: 'file-text'
+									}
+									size={18}
+									color={failed ? theme.text : '#fff'}
+									style={{ marginRight: 8 }}
+								/>
+							)}
 							<Text
 								style={{
 									color: failed ? theme.text : '#fff',
@@ -874,7 +900,13 @@ export default function PlaybackScreen({ route, navigation }) {
 									fontSize: 15,
 								}}
 							>
-								{transcribeLabel}
+								{transcribing ? 'Transcribing...' : transcribeLabel}
+							</Text>
+						</TouchableOpacity>
+						
+						<TouchableOpacity onPress={() => { setMenuOpen(false); navigation.navigate('TranscriptionSettings'); }} style={{ marginBottom: 32 }}>
+							<Text style={{ color: theme.textMuted, fontSize: 13, textDecorationLine: 'underline', textAlign: 'center', marginTop: 16 }}>
+								Change audio language ({transcriptionLanguage})
 							</Text>
 						</TouchableOpacity>
 
