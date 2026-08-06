@@ -15,10 +15,12 @@ import SettingsHeader from '../../components/SettingsHeader';
 import { SettingsSection } from '../../components/SettingsNavRow';
 import { getGroqApiKey, setGroqApiKey, getPrefs, setPrefs } from '../../utils/settingsStore';
 import InfoPopover from '../../components/InfoPopover';
+import { useAlert } from '../../theme/AlertContext';
 
 export default function TranscriptionSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
+	const alert = useAlert();
 	const [apiKey, setApiKey] = useState('');
 	const [autoTranscribe, setAutoTranscribe] = useState(false);
 	const [transcriptionLanguage, setTranscriptionLanguage] = useState('auto');
@@ -46,6 +48,15 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 	async function handleLanguageChange(code) {
 		setTranscriptionLanguage(code);
 		await setPrefs({ transcriptionLanguage: code });
+
+		if (code !== 'auto' && code !== 'en') {
+			const langName = LANGUAGES.find((l) => l.code === code)?.label || 'this language';
+			alert(
+				'',
+				`Transcription for ${langName} is currently very inaccurate. For best results use 'English' language and 'Accurate' model for accurate english translation of audio`,
+				[{ text: 'Got it' }]
+			);
+		}
 	}
 
 	async function handleModelChange(modelId) {
@@ -132,8 +143,8 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 			<SettingsSection
 				title='Transcription Language'
 				right={
-					<InfoPopover title='Force Language'>
-						{`Whisper usually auto-detects the language you are speaking.\n\nHowever, for some languages (like Tamil), if Auto-detect translates your speech into English instead of writing it in the native script, you can strictly enforce the language here.`}
+					<InfoPopover title='Transcription Accuracy'>
+						{`Best Practices for Accuracy:\n\n• For English Audio: Use English language with the Fast (Turbo) model.\n\n• For Regional Audio (Tamil, Telugu, etc.): The native script transcription accuracy is currently very low (30-40%).\n\nInstead, the best option for regional audio is to select the English language and use the Accurate (Large v3) model. This will accurately translate your regional speech into English text.`}
 					</InfoPopover>
 				}
 			>
@@ -170,7 +181,7 @@ export default function TranscriptionSettingsScreen({ navigation }) {
 				title='Whisper Model'
 				right={
 					<InfoPopover title='Whisper Models'>
-						{`whisper-large-v3-turbo is incredibly fast and uses minimal Groq free-tier quota.\n\nHowever, whisper-large-v3 is the full model and has significantly better accuracy for languages like Tamil and Telugu, at the cost of being slightly slower and using more hourly quota.`}
+						{`• Fast (Turbo): Best for English audio. Incredibly fast and uses minimal Groq free-tier quota.\n\n• Accurate (Large v3): The best option for regional languages. Pair this with the 'English' language option to get highly accurate English translations of your regional audio. (Note: using this model to output native regional script is currently not recommended due to low accuracy).`}
 					</InfoPopover>
 				}
 			>

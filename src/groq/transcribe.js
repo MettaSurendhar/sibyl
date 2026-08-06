@@ -83,21 +83,9 @@ export function languageDisplayName(code) {
 // True if Whisper's own confidence signals suggest this segment is silence, noise, or a
 // repetition-loop hallucination rather than real transcribed speech.
 function isHallucinatedSegment(seg) {
-	if (
-		typeof seg.no_speech_prob === 'number' &&
-		seg.no_speech_prob > NO_SPEECH_PROB_THRESHOLD
-	)
-		return true;
-	if (
-		typeof seg.avg_logprob === 'number' &&
-		seg.avg_logprob < AVG_LOGPROB_THRESHOLD
-	)
-		return true;
-	if (
-		typeof seg.compression_ratio === 'number' &&
-		seg.compression_ratio > COMPRESSION_RATIO_THRESHOLD
-	)
-		return true;
+	// Temporarily disable hallucination filtering entirely. For Indian languages,
+	// Whisper's confidence scores are naturally very low, and these heuristics
+	// end up silently deleting perfectly valid transcribed speech.
 	return false;
 }
 

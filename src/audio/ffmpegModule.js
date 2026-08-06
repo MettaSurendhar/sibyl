@@ -78,7 +78,7 @@ export async function compressAndSplitForTranscription(inputUri) {
   await FileSystem.makeDirectoryAsync(chunkDir, { intermediates: true });
   
   // segment_time 300 splits into 5 minute chunks (safest for free tier APIs)
-  const command = `-y -i "${toFfmpegPath(inputUri)}" -vn -ac 1 -ar 16000 -c:a aac -b:a 32k -f segment -segment_time 300 "${toFfmpegPath(chunkDir)}chunk_%03d.m4a"`;
+  const command = `-y -i "${toFfmpegPath(inputUri)}" -vn -ac 1 -ar 16000 -c:a aac -b:a 64k -f segment -segment_time 300 "${toFfmpegPath(chunkDir)}chunk_%03d.m4a"`;
 
   // Use a generous timeout: a 1-hour file at 60x speed takes ~60s; add buffer for slow devices.
   const session = await new Promise((resolve, reject) => {
