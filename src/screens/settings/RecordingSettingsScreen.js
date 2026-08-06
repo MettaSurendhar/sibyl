@@ -5,8 +5,7 @@ import {
 	ScrollView,
 	StyleSheet,
 	Platform,
-	TextInput,
-	Switch,
+	Modal,
 } from 'react-native';
 import Text from '../../theme/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,13 +17,10 @@ import { SettingsSection } from '../../components/SettingsNavRow';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoPopover from '../../components/InfoPopover';
 import {
+	getRecordingsFolderUri,
 	setRecordingsFolderUri,
 	getTranscriptFolderUri,
 	setTranscriptFolderUri,
-	getGroqApiKey,
-	setGroqApiKey,
-	getPrefs,
-	setPrefs,
 } from '../../utils/settingsStore';
 import {
 	pickFolder,
@@ -46,25 +42,13 @@ export default function RecordingSettingsScreen({ navigation }) {
 		total: 0,
 		phase: ''
 	});
-	const [groqKey, setGroqKeyState] = useState('');
-	const [autoTranscribe, setAutoTranscribe] = useState(false);
+
+	const [folderMenuVisible, setFolderMenuVisible] = useState(false);
 
 	useEffect(() => {
 		getRecordingsFolderUri().then(setRecordingsFolderUriState);
 		getTranscriptFolderUri().then(setTranscriptFolderUriState);
-		getGroqApiKey().then((k) => setGroqKeyState(k || ''));
-		getPrefs().then((p) => setAutoTranscribe(p.autoTranscribe || false));
 	}, []);
-
-	async function handleGroqKeyChange(val) {
-		setGroqKeyState(val);
-		await setGroqApiKey(val);
-	}
-
-	async function handleAutoTranscribeChange(val) {
-		setAutoTranscribe(val);
-		await setPrefs({ autoTranscribe: val });
-	}
 
 	async function chooseRecordingsFolder() {
 		if (!isExternalFolderSupported()) {
@@ -136,6 +120,7 @@ export default function RecordingSettingsScreen({ navigation }) {
 	}
 
 	return (
+		<>
 		<ScrollView
 			style={[styles.container, { backgroundColor: theme.bg }]}
 			contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16 }}
@@ -157,8 +142,12 @@ export default function RecordingSettingsScreen({ navigation }) {
 					style={[
 						styles.navButton,
 						{ backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+						folderMenuVisible && !!recordingsFolderUri && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 }
 					]}
-					onPress={chooseRecordingsFolder}
+					onPress={() => {
+						if (recordingsFolderUri) setFolderMenuVisible(!folderMenuVisible);
+						else chooseRecordingsFolder();
+					}}
 				>
 					<Feather
 						name='folder'
@@ -175,21 +164,33 @@ export default function RecordingSettingsScreen({ navigation }) {
 							: 'Choose a folder'}
 					</Text>
 					<Feather
-						name='chevron-right'
+						name={folderMenuVisible && !!recordingsFolderUri ? 'chevron-up' : 'chevron-down'}
 						size={18}
 						color={theme.textMuted}
 					/>
 				</TouchableOpacity>
+				{folderMenuVisible && !!recordingsFolderUri && (
+					<View style={{
+						backgroundColor: theme.surfaceAlt,
+						borderColor: theme.border,
+						borderWidth: 1,
+						borderTopWidth: 0,
+						borderBottomLeftRadius: 12,
+						borderBottomRightRadius: 12,
+						paddingBottom: 4,
+						paddingHorizontal: 8,
+						marginBottom: 12
+					}}>
+						<TouchableOpacity onPress={() => { setFolderMenuVisible(false); chooseRecordingsFolder(); }} style={{ paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+							<Text style={{ color: theme.text, fontSize: 15 }}>Change folder</Text>
+						</TouchableOpacity>
+						<TouchableOpacity onPress={() => { setFolderMenuVisible(false); clearRecordingsFolder(); }} style={{ paddingVertical: 12, paddingHorizontal: 8 }}>
+							<Text style={{ color: theme.danger, fontSize: 15 }}>Stop mirroring</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 				{!!recordingsFolderUri && (
 					<>
-						<TouchableOpacity
-							onPress={clearRecordingsFolder}
-							style={{ marginTop: 10 }}
-						>
-							<Text style={{ color: theme.textMuted, fontSize: 13 }}>
-								Stop mirroring to this folder
-							</Text>
-						</TouchableOpacity>
 						<TouchableOpacity
 							disabled={syncing}
 							onPress={() => setSyncModalVisible(true)}
@@ -198,7 +199,7 @@ export default function RecordingSettingsScreen({ navigation }) {
 								{
 									backgroundColor: theme.surfaceAlt,
 									borderColor: theme.border,
-									marginTop: 12,
+									marginTop: folderMenuVisible ? 0 : 12,
 									opacity: syncing ? 0.6 : 1,
 								},
 							]}
@@ -214,12 +215,10 @@ export default function RecordingSettingsScreen({ navigation }) {
 									? `Syncing (${syncProgress.phase})... ${syncProgress.done}/${syncProgress.total}`
 									: 'Sync with folder (Import/Export)'}
 							</Text>
+							<InfoPopover title='Sync explanation'>
+								Pushes any of your existing Sibyl recordings into this folder, and pulls in any foreign audio files it finds there.
+							</InfoPopover>
 						</TouchableOpacity>
-						<Text
-							style={{ color: theme.textMuted, marginTop: 6, fontSize: 12 }}
-						>
-							Pushes any of your existing Sibyl recordings into this folder, and pulls in any foreign audio files it finds there.
-						</Text>
 					</>
 				)}
 			</SettingsSection>
@@ -271,47 +270,6 @@ export default function RecordingSettingsScreen({ navigation }) {
 				)}
 			</SettingsSection>
 
-			<SettingsSection
-				title='Auto-Transcription (Groq Whisper)'
-				right={
-					<InfoPopover title='Groq Transcription'>
-						{`• Generates text from your audio automatically when you save a recording.\n• Requires a free Groq API key.\n• Uses the whisper-large-v3-turbo model for incredibly fast and accurate transcription.\n• Transcripts are stored locally and are searchable in the Library.`}
-					</InfoPopover>
-				}
-			>
-				<View style={{ marginBottom: 16 }}>
-					<Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8 }}>
-						Groq API Key
-					</Text>
-					<TextInput
-						value={groqKey}
-						onChangeText={handleGroqKeyChange}
-						placeholder="gsk_..."
-						placeholderTextColor={theme.textMuted}
-						secureTextEntry
-						style={[
-							styles.input,
-							{ borderColor: theme.border, color: theme.text, backgroundColor: theme.surfaceAlt }
-						]}
-					/>
-				</View>
-				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-					<Text style={{ color: theme.text, fontSize: 15, fontWeight: '500' }}>
-						Auto-transcribe new recordings
-					</Text>
-					<Switch
-						value={autoTranscribe}
-						onValueChange={handleAutoTranscribeChange}
-						disabled={!groqKey}
-					/>
-				</View>
-				{!groqKey && (
-					<Text style={{ color: theme.accent, fontSize: 12, marginTop: 8 }}>
-						Enter an API key to enable auto-transcription.
-					</Text>
-				)}
-			</SettingsSection>
-
 			<ConfirmModal
 				visible={syncModalVisible}
 				title='Sync with folder?'
@@ -322,6 +280,7 @@ export default function RecordingSettingsScreen({ navigation }) {
 				onConfirm={runSync}
 			/>
 		</ScrollView>
+		</>
 	);
 }
 

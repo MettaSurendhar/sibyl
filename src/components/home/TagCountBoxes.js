@@ -3,6 +3,7 @@ import { View, TouchableWithoutFeedback, Animated, StyleSheet } from 'react-nati
 import Text from '../../theme/Text';
 import { useTheme } from '../../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
+import { iconForCategory } from '../../utils/tagColors';
 
 function AnimatedTagBox({ tag, onTagPress }) {
 	const { theme } = useTheme();
@@ -64,26 +65,26 @@ function AnimatedTagBox({ tag, onTagPress }) {
 					},
 				]}
 			>
+				<Feather 
+					name={iconForCategory(tag)} 
+					size={18} 
+					color={theme.accent} 
+					style={{ position: 'absolute', top: 12, left: 12 }} 
+				/>
 				{tag.count === 0 ? (
-					<>
-						<Feather name={tag.icon || 'tag'} size={24} color={theme.textMuted} />
-						<Text style={[styles.emptyText, { color: theme.textMuted }]} numberOfLines={2}>
-							Start your first {tag.name.toLowerCase()}
-						</Text>
-					</>
+					<Text style={[styles.emptyText, { color: theme.textMuted, marginTop: 16 }]} numberOfLines={2}>
+						Start your first {tag.name.toLowerCase()}
+					</Text>
 				) : (
-					<>
-						<View style={styles.countRow}>
-							<Text style={[styles.count, { color: theme.text }]}>{displayCount}</Text>
-							<Feather name={tag.icon || 'tag'} size={20} color={theme.textMuted} style={{ marginLeft: 6 }} />
-						</View>
+					<View style={{ alignItems: 'center', marginTop: 10 }}>
+						<Text style={[styles.count, { color: theme.text }]}>{displayCount}</Text>
 						<Text
-							style={[styles.name, { color: theme.textMuted }]}
+							style={[styles.name, { color: theme.textMuted, marginTop: 4 }]}
 							numberOfLines={1}
 						>
 							{tag.name}
 						</Text>
-					</>
+					</View>
 				)}
 			</Animated.View>
 		</TouchableWithoutFeedback>
@@ -119,12 +120,6 @@ const styles = StyleSheet.create({
 		padding: 16,
 		alignItems: 'center',
 		justifyContent: 'center',
-	},
-	countRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 6,
-		gap: 6,
 	},
 	count: { fontSize: 34, fontWeight: '800' },
 	name: { fontSize: 12, fontWeight: '600' },

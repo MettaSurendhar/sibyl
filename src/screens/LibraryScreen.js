@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
 	View,
 	TextInput,
@@ -10,6 +10,7 @@ import {
 	LayoutAnimation,
 	Platform,
 	UIManager,
+	DeviceEventEmitter,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -33,6 +34,7 @@ import {
 	isExternalFolderSupported,
 } from '../utils/externalFolder';
 import { groupByDate, dateRangeForPreset } from '../utils/format';
+import { DB_UPDATED_EVENT } from '../utils/events';
 import EntryRow from '../components/EntryRow';
 import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -99,9 +101,16 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 		}, [initialFilter, onFilterConsumed])
 	);
 
+	// Refresh in real-time when any DB write happens (transcriptions, sync, etc.)
+	useEffect(() => {
+		const sub = DeviceEventEmitter.addListener(DB_UPDATED_EVENT, refresh);
+		return () => sub.remove();
+	}, [refresh]);
+
 	// Close any open overlay on back button/gesture before letting default back navigation happen.
 	useFocusEffect(
 		useCallback(() => {
+			const isFilterActive = filter.tagIds.length > 0 || !!filter.datePreset;
 			const onBack = () => {
 				if (menuOpen) {
 					setMenuOpen(false);
@@ -109,6 +118,10 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 				}
 				if (searchOpen) {
 					setSearchOpen(false);
+					return true;
+				}
+				if (isFilterActive) {
+					setFilter(EMPTY_FILTER);
 					return true;
 				}
 				if (editMode) {
@@ -120,14 +133,17 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			};
 			const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
 			return () => sub.remove();
-		}, [menuOpen, searchOpen, editMode]),
+		}, [menuOpen, searchOpen, filter, editMode]),
 	);
 
 	const filtered = useMemo(() => {
 		let list = entries;
 		if (search.trim()) {
 			const q = search.toLowerCase();
-			list = list.filter((e) => e.title.toLowerCase().includes(q));
+			list = list.filter((e) => 
+				e.title.toLowerCase().includes(q) || 
+				(e.transcript && e.transcript.toLowerCase().includes(q))
+			);
 		}
 		if (filter.tagIds.length) {
 			list = list.filter(
@@ -239,7 +255,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 				try {
 					// Copy to a temp file with the user-defined entry name
 					const ext = lastSegUri.split('.').pop() || 'm4a';
-					const cleanName = (target.name || 'Recording').replace(/[^a-zA-Z0-9 \-_]/g, '_').trim();
+					const cleanName = (target.title || 'Recording').replace(/[^a-zA-Z0-9 \-_]/g, '_').trim();
 					const tempUri = FileSystem.cacheDirectory + cleanName + '.' + ext;
 					await FileSystem.copyAsync({ from: lastSegUri, to: tempUri });
 					await Sharing.shareAsync(tempUri);
@@ -265,7 +281,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 					const lastSegUri = t.segments[t.segments.length - 1]?.uri;
 					if (lastSegUri) {
 						// Clean filename of invalid characters, fallback to index if empty
-						let cleanName = (t.name || 'Recording ' + index).replace(/[^a-zA-Z0-9 -]/g, '_').trim();
+						let cleanName = (t.title || 'Recording ' + index).replace(/[^a-zA-Z0-9 -]/g, '_').trim();
 						if (!cleanName) cleanName = 'Recording ' + index;
 						
 						const ext = lastSegUri.split('.').pop() || 'm4a';
@@ -372,7 +388,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 						<>
 							<TouchableOpacity
 								onPress={() => setSearchOpen((v) => !v)}
-								style={styles.headerBtn}
+								style={[styles.headerBtn, { backgroundColor: searchOpen ? `${theme.accent}33` : theme.surfaceAlt }]}
 							>
 								<Feather
 									name='search'
@@ -382,7 +398,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 							</TouchableOpacity>
 							<TouchableOpacity
 								onPress={() => setFilterOpen(true)}
-								style={styles.headerBtn}
+								style={[styles.headerBtn, { backgroundColor: activeFilterCount ? `${theme.accent}33` : theme.surfaceAlt }]}
 							>
 								<Feather
 									name='filter'
@@ -404,7 +420,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 							</TouchableOpacity>
 							<TouchableOpacity
 								onPress={() => setMenuOpen((v) => !v)}
-								style={styles.headerBtn}
+								style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
 							>
 								<Feather
 									name='more-vertical'
@@ -696,8 +712,14 @@ const styles = StyleSheet.create({
 	},
 	headerTitle: { fontSize: 20, fontWeight: '700' },
 	headerCount: { fontSize: 12, marginTop: 1 },
-	headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-	headerBtn: { padding: 4 },
+	headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	headerBtn: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	selectAllRow: { flexDirection: 'row', alignItems: 'center' },
 	filterBadge: {
 		position: 'absolute',

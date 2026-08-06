@@ -48,13 +48,21 @@ export default function EntryRow({
 					>
 						{entry.title}
 					</Text>
-					<Text style={[styles.subtitle, { color: theme.textMuted }]}>
-						{entry.categoryIcon || UNTAGGED_ICON} {entry.categoryName || 'Untagged'} ·{' '}
-						{showAbsoluteDate
-							? fullDateTimeLabel(entry.updatedAt)
-							: timeLabel(entry.updatedAt)}
-					</Text>
-					{entry.transcript ? (
+					<View style={{ marginTop: 4 }}>
+						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+							<Feather name={entry.categoryIcon || UNTAGGED_ICON} size={12} color={theme.textMuted} />
+							<Text style={[styles.subtitle, { color: theme.textMuted, marginTop: 0, marginLeft: 4 }]}>
+								{entry.categoryName || 'Untagged'}
+								{!editMode && ` · ${showAbsoluteDate ? fullDateTimeLabel(entry.updatedAt) : timeLabel(entry.updatedAt)}`}
+							</Text>
+						</View>
+						{editMode && (
+							<Text style={[styles.subtitle, { color: theme.textMuted, marginTop: 2 }]}>
+								{showAbsoluteDate ? fullDateTimeLabel(entry.updatedAt) : timeLabel(entry.updatedAt)}
+							</Text>
+						)}
+					</View>
+					{!editMode && (entry.transcript ? (
 						<Text style={[styles.transcriptSnippet, { color: theme.textMuted }]} numberOfLines={1}>
 							"{entry.transcript}"
 						</Text>
@@ -63,7 +71,7 @@ export default function EntryRow({
 							<Feather name="loader" size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
 							<Text style={{ fontSize: 12, color: theme.textMuted, fontStyle: 'italic' }}>Transcribing...</Text>
 						</View>
-					) : null}
+					) : null)}
 				</View>
 
 				<Text style={[styles.duration, { color: theme.textMuted }]}>

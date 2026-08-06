@@ -153,10 +153,10 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 			<Animated.View style={[styles.container, animatedStyle]}>
 				{/* Idle pulse ring */}
 				<Animated.View style={[styles.pulse, { borderColor: theme.accent }, pulseStyle]} />
-				
+
 				{/* Halo ring to lift it off the dark background */}
 				<View style={[styles.halo, { borderColor: theme.accent }]} />
-				
+
 				{/* The actual button */}
 				<View style={[styles.fab, { backgroundColor: theme.accent }]}>
 					<Feather

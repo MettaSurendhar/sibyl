@@ -3,45 +3,13 @@ import {
 	View,
 	TouchableOpacity,
 	StyleSheet,
-	Modal,
+	TextInput,
 } from 'react-native';
 import Text from '../theme/Text';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';
 
-// Recognizes every token shape the naming templates already support (see utils/naming.js):
-// {tag}, {name}, <count>, <date>, <date:PATTERN>, <time:PATTERN>. Matching + splitting use the
-// same pattern so segment boundaries always line up.
-const TOKEN_SPLIT =
-	/(\{tag\}|\{name\}|<count>|<date(?::[^>]+)?>|<time:[^>]+>)/g;
-const TOKEN_MATCH =
-	/^(\{tag\}|\{name\}|<count>|<date(?::[^>]+)?>|<time:[^>]+>)$/;
-
-function parseSegments(template) {
-	return (template || '')
-		.split(TOKEN_SPLIT)
-		.filter((part) => part !== '')
-		.map((part, i) => ({
-			key: `${i}-${part}`,
-			text: part,
-			isToken: TOKEN_MATCH.test(part),
-		}));
-}
-
-function labelForToken(token) {
-	if (token === '{tag}') return 'Tag';
-	if (token === '{name}') return 'Name';
-	if (token === '<count>') return 'Count';
-	if (token.startsWith('<date')) return 'Date';
-	if (token.startsWith('<time')) return 'Time';
-	return token;
-}
-
-// value/onChange: the raw template string, still stored/serialized exactly as before - only the
-// editing UI changes. availableTokens: [{ token: '<count>', label: 'Count' }, ...] shown as
-// tappable "+ Token" buttons appropriate to this template (untagged vs derived-recording naming
-// use different token sets).
 export default function TemplateChipEditor({
 	value,
 	onChange,
@@ -54,8 +22,6 @@ export default function TemplateChipEditor({
 	});
 	const [pickerType, setPickerType] = useState(null);
 
-	const segments = parseSegments(value);
-
 	function getBaseToken(str) {
 		if (str.startsWith('<date')) return '<date>';
 		if (str.startsWith('<time')) return '<time>';
@@ -63,7 +29,7 @@ export default function TemplateChipEditor({
 	}
 
 	const usedBaseTokens = new Set(
-		segments.filter((s) => s.isToken).map((s) => getBaseToken(s.text))
+		(value || '').match(/(\{tag\}|\{name\}|<count>|<date(?::[^>]+)?>|<time:[^>]+>)/g)?.map(getBaseToken) || []
 	);
 
 	const visibleTokens = availableTokens.filter(
@@ -96,64 +62,36 @@ export default function TemplateChipEditor({
 		}
 	}
 
-	function removeSegmentAt(index) {
-		const next = segments
-			.filter((_, i) => i !== index)
-			.map((s) => s.text)
-			.join('');
-		onChange(next);
+	function renderHighlightedText(text) {
+		if (!text) return null;
+		const parts = text.split(/(\{tag\}|\{name\}|<count>|<date(?::[^>]+)?>|<time:[^>]+>)/g);
+		return parts.map((part, i) => {
+			if (/^(\{tag\}|\{name\}|<count>|<date(?::[^>]+)?>|<time:[^>]+>)$/.test(part)) {
+				return <Text key={i} style={{ color: theme.accent, fontWeight: '700' }}>{part}</Text>;
+			}
+			return <Text key={i} style={{ color: theme.text }}>{part}</Text>;
+		});
 	}
 
 	return (
 		<View>
-			<View
-				style={[
-					styles.chipField,
-					{ borderColor: theme.border, backgroundColor: theme.surfaceAlt },
-				]}
-			>
-				{segments.length === 0 ? (
-					<Text style={{ color: theme.textMuted, fontSize: 13 }}>
-						Empty — add tokens below or type your own
-					</Text>
-				) : (
-					segments.map((seg, i) =>
-						seg.isToken ? (
-							<View
-								key={seg.key}
-								style={[
-									styles.chip,
-									{
-										backgroundColor: `${theme.accent}22`,
-										borderColor: theme.accent,
-									},
-								]}
-							>
-								<Text style={[styles.chipText, { color: theme.accent }]}>
-									{labelForToken(seg.text)}
-								</Text>
-								<TouchableOpacity
-									onPress={() => removeSegmentAt(i)}
-									hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-								>
-									<Feather
-										name='x'
-										size={12}
-										color={theme.accent}
-										style={{ marginLeft: 4 }}
-									/>
-								</TouchableOpacity>
-							</View>
-						) : (
-							<Text
-								key={seg.key}
-								style={[styles.literalText, { color: theme.text }]}
-							>
-								{seg.text}
-							</Text>
-						),
-					)
-				)}
+			<View style={{ marginBottom: 12 }}>
+				<TextInput
+					style={[
+						styles.rawInput,
+						{
+							borderColor: theme.border,
+							backgroundColor: theme.surfaceAlt,
+						},
+					]}
+					onChangeText={onChange}
+					onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
+					placeholder="Type naming format here..."
+					placeholderTextColor={theme.textMuted}
+					multiline
+				>
+					{renderHighlightedText(value)}
+				</TextInput>
 			</View>
 
 			<View style={styles.tokenRow}>
@@ -178,67 +116,39 @@ export default function TemplateChipEditor({
 				))}
 			</View>
 
-			<Modal
-				visible={!!pickerType}
-				transparent
-				animationType='fade'
-				onRequestClose={() => setPickerType(null)}
-			>
-				<TouchableOpacity
-					style={styles.backdrop}
-					activeOpacity={1}
-					onPress={() => setPickerType(null)}
-				>
-					<View style={[styles.pickerCard, { backgroundColor: theme.surface }]}>
-						<Text style={[styles.pickerTitle, { color: theme.text }]}>
+			{pickerType && (
+				<View style={[styles.inlinePicker, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+					<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+						<Text style={[styles.pickerTitle, { color: theme.text, marginBottom: 0 }]}>
 							{pickerType === 'date' ? 'Date Format' : 'Time Format'}
 						</Text>
-						<View style={styles.presetWrap}>
-							{(pickerType === 'date'
-								? DATE_FORMAT_PRESETS
-								: TIME_FORMAT_PRESETS
-							).map((p) => (
-								<TouchableOpacity
-									key={p.key}
-									onPress={() => insertToken(`<${pickerType}:${p.pattern}>`)}
-									style={[styles.presetChip, { borderColor: theme.border }]}
-								>
-									<Text style={{ color: theme.text, fontSize: 13 }}>
-										{p.key}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
+						<TouchableOpacity onPress={() => setPickerType(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Feather name="x" size={18} color={theme.textMuted} />
+						</TouchableOpacity>
 					</View>
-				</TouchableOpacity>
-			</Modal>
+					<View style={styles.presetWrap}>
+						{(pickerType === 'date'
+							? DATE_FORMAT_PRESETS
+							: TIME_FORMAT_PRESETS
+						).map((p) => (
+							<TouchableOpacity
+								key={p.key}
+								onPress={() => insertToken(`<${pickerType}:${p.pattern}>`)}
+								style={[styles.presetChip, { borderColor: theme.border }]}
+							>
+								<Text style={{ color: theme.text, fontSize: 13 }}>
+									{p.key}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
+			)}
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	chipField: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderRadius: 12,
-		padding: 10,
-		minHeight: 44,
-		marginBottom: 8,
-	},
-	chip: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderRadius: 8,
-		paddingVertical: 4,
-		paddingHorizontal: 8,
-		marginRight: 6,
-		marginBottom: 4,
-	},
-	chipText: { fontSize: 12, fontWeight: '700' },
-	literalText: { fontSize: 13, marginRight: 2, marginBottom: 4 },
 	tokenRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, gap: 8 },
 	tokenBtn: {
 		flexDirection: 'row',
@@ -248,24 +158,16 @@ const styles = StyleSheet.create({
 		paddingVertical: 6,
 		paddingHorizontal: 10,
 	},
-	rawInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14 },
-	backdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.5)',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 24,
-	},
-	pickerCard: {
-		width: '100%',
-		maxWidth: 340,
-		borderRadius: 16,
-		padding: 20,
+	rawInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, minHeight: 44 },
+	inlinePicker: {
+		borderWidth: 1,
+		borderRadius: 12,
+		padding: 16,
+		marginTop: 8,
 	},
 	pickerTitle: {
-		fontSize: 16,
+		fontSize: 14,
 		fontWeight: '700',
-		marginBottom: 16,
 	},
 	presetWrap: {
 		flexDirection: 'row',

@@ -22,15 +22,16 @@ import {
 	previewUntaggedName,
 	totalEntryCount,
 } from '../db/categories';
-import { createEntry, saveTranscript } from '../db/entries';
+import { createEntry, setTranscript, setTranscriptStatus } from '../db/entries';
 import {
 	getRecordingsFolderUri,
 	getFolderHintDismissed,
 	setFolderHintDismissed,
 	getPrefs,
+	getGroqApiKey,
 } from '../utils/settingsStore';
 import { isExternalFolderSupported } from '../utils/externalFolder';
-import { transcribeAudio } from '../utils/transcribe';
+import { transcribeFile } from '../groq/transcribe';
 import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -181,14 +182,15 @@ export default function RecordScreen({ navigation }) {
 		// Fire-and-forget background transcription
 		getPrefs().then(async (prefs) => {
 			if (prefs.autoTranscribe) {
-				await saveTranscript(id, null, 'processing');
-				const res = await transcribeAudio(result.uri);
-				if (res.error) {
-					await saveTranscript(id, res.error, 'error');
-				} else if (res.text) {
-					await saveTranscript(id, res.text, 'done');
-				} else {
-					await saveTranscript(id, null, 'error');
+				const apiKey = await getGroqApiKey();
+				if (!apiKey) return;
+				await setTranscriptStatus(id, 'processing');
+				try {
+					const res = await transcribeFile(result.uri, apiKey);
+					await setTranscript(id, res.text, res.language);
+				} catch (err) {
+					await setTranscript(id, err.message || 'Transcription failed', null);
+					await setTranscriptStatus(id, 'error');
 				}
 			}
 		});

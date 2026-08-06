@@ -14,6 +14,8 @@ const TERMS_TEXT = `By using Sibyl, you agree that the app is provided "as is" a
 
 const OSS_TEXT = `Sibyl is built using incredible open-source software, including:\n\n• React Native\n• Expo\n• FFMpeg Kit\n• React Native Reanimated\n• React Native Gesture Handler\n• React Navigation\n\nFull license details for these and other dependencies can be found in the source code repository.`;
 
+const AUDIO_FORMAT_TEXT = `Sibyl records all audio in AAC format, stored in an M4A container. This is the only format natively supported by Android's built-in recording hardware, so there is no format choice — it's what your device's microphone produces directly.\n\n✓ Advantages\n• Excellent audio quality at small file sizes (lossy but near-lossless at high bitrates)\n• Universally supported — plays natively on Android, iOS, Windows, macOS, and all major media apps\n• Fast to record and save — no post-processing needed\n• Ideal for voice: optimised for speech frequencies\n\n✗ Trade-offs\n• Lossy compression — original audio waveform is not preserved bit-for-bit (imperceptible for voice journaling)\n• Not editable in some older audio workstations that only accept WAV/MP3`;
+
 export default function AboutSettingsScreen({ navigation }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
@@ -47,25 +49,14 @@ export default function AboutSettingsScreen({ navigation }) {
 					</Text>
 				</SettingsSection>
 
-				<SettingsSection title='Audio Format'>
-					<Text style={{ color: theme.text, fontWeight: '600', marginBottom: 6 }}>
-						AAC / M4A (.m4a)
-					</Text>
-					<Text style={{ color: theme.textMuted, lineHeight: 22, marginBottom: 12 }}>
-						Sibyl records all audio in AAC format, stored in an M4A container. This is the only format natively supported by Android's built-in recording hardware, so there is no format choice — it's what your device's microphone produces directly.
-					</Text>
-					<Text style={{ color: theme.accent, fontWeight: '600', marginBottom: 4 }}>
-						✓ Advantages
-					</Text>
-					<Text style={{ color: theme.textMuted, lineHeight: 22, marginBottom: 12 }}>
-						{`• Excellent audio quality at small file sizes (lossy but near-lossless at high bitrates)\n• Universally supported — plays natively on Android, iOS, Windows, macOS, and all major media apps\n• Fast to record and save — no post-processing needed\n• Ideal for voice: optimised for speech frequencies`}
-					</Text>
-					<Text style={{ color: theme.textMuted, fontWeight: '600', marginBottom: 4 }}>
-						✗ Trade-offs
-					</Text>
-					<Text style={{ color: theme.textMuted, lineHeight: 22 }}>
-						{`• Lossy compression — original audio waveform is not preserved bit-for-bit (imperceptible for voice journaling)\n• Not editable in some older audio workstations that only accept WAV/MP3`}
-					</Text>
+				<SettingsSection title='Technical Info'>
+					<TouchableOpacity 
+						style={[styles.optionRow, { borderColor: theme.border }]}
+						onPress={() => openLegal('Audio Format (AAC/M4A)', AUDIO_FORMAT_TEXT)}
+					>
+						<Text style={{ color: theme.text, flex: 1 }}>Audio Format (AAC/M4A)</Text>
+						<Feather name="chevron-right" size={18} color={theme.textMuted} />
+					</TouchableOpacity>
 				</SettingsSection>
 
 				<SettingsSection title='Legal'>

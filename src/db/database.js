@@ -127,9 +127,9 @@ export async function getDb() {
 	);
 	if (row.c === 0) {
 		const defaults = [
-			{ name: 'Diary', prefix: 'Diary', icon: '📔' },
-			{ name: 'Thoughts', prefix: 'Thought', icon: '💭' },
-			{ name: 'Rant', prefix: 'Rant', icon: '😤' },
+			{ name: 'Diary', prefix: 'Diary', icon: 'book' },
+			{ name: 'Thoughts', prefix: 'Thought', icon: 'message-circle' },
+			{ name: 'Rant', prefix: 'Rant', icon: 'activity' },
 		];
 		for (let i = 0; i < defaults.length; i++) {
 			await dbInstance.runAsync(

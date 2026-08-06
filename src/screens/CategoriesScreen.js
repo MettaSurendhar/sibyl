@@ -12,8 +12,9 @@ import {
   deleteCategory,
   getCategoryEntryCount,
 } from '../db/categories';
-import { renderTemplate, DATE_FORMAT_PRESETS, TIME_FORMAT_PRESETS } from '../utils/naming';
+import { renderTemplate } from '../utils/naming';
 import ConfirmModal from '../components/ConfirmModal';
+import TemplateChipEditor from '../components/TemplateChipEditor';
 import { TAG_COLOR_PALETTE, TAG_ICON_PRESETS, iconForCategory } from '../utils/tagColors';
 
 export default function CategoriesScreen({ navigation }) {
@@ -27,6 +28,7 @@ export default function CategoriesScreen({ navigation }) {
   const [editTemplate, setEditTemplate] = useState('');
   const [editColor, setEditColor] = useState(null);
   const [editIcon, setEditIcon] = useState(null);
+  const [editMode, setEditMode] = useState('main');
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -35,8 +37,8 @@ export default function CategoriesScreen({ navigation }) {
     // Quick migration: if an icon is not a valid feather icon (contains emojis), set to default
     let migrated = false;
     for (const c of cats) {
-      if (c.icon && !/^[a-z\-]+$/.test(c.icon)) {
-        await updateCategory(c.id, { icon: 'tag' });
+      if (c.icon && !/^[a-z0-9\-]+$/.test(c.icon)) {
+        await updateCategory(c.id, { ...c, icon: 'tag' });
         migrated = true;
       }
     }
@@ -68,9 +70,11 @@ export default function CategoriesScreen({ navigation }) {
   function openEdit(cat) {
     setEditTarget(cat);
     setEditName(cat.name);
-    setEditTemplate(cat.nameTemplate || '{tag} <count>');
+    const nextTag = cat.nameTemplate || '{tag} <count>';
+    setEditTemplate(nextTag);
     setEditColor(cat.color);
     setEditIcon(cat.icon);
+    setEditMode('main');
   }
 
   async function saveEdit() {
@@ -175,77 +179,78 @@ export default function CategoriesScreen({ navigation }) {
                 style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt, marginBottom: 14 }]}
               />
 
-              <Text style={[styles.label, { color: theme.textMuted }]}>Color</Text>
-              <View style={styles.colorRow}>
-                {TAG_COLOR_PALETTE.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    onPress={() => setEditColor(color)}
-                    style={[
-                      styles.colorSwatch,
-                      { backgroundColor: color, borderWidth: editColor === color ? 3 : 0, borderColor: theme.text }
-                    ]}
-                  />
-                ))}
-              </View>
-
-              <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Icon</Text>
-              <View style={styles.colorRow}>
-                {TAG_ICON_PRESETS.map((iconName) => (
-                  <TouchableOpacity
-                    key={iconName}
-                    onPress={() => setEditIcon(iconName)}
-                    style={[
-                      styles.iconSwatch,
-                      { borderColor: editIcon === iconName ? theme.accent : 'transparent', borderWidth: 2 }
-                    ]}
-                  >
-                     <Feather name={iconName} size={20} color={theme.text} />
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14, zIndex: 10 }}>
+                <View style={{ flex: 1, zIndex: editMode === 'color' ? 20 : 1 }}>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Color</Text>
+                  <TouchableOpacity onPress={() => setEditMode(editMode === 'color' ? 'main' : 'color')} style={[styles.modalInput, { alignItems: 'center', justifyContent: 'center', borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: editColor, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }} />
                   </TouchableOpacity>
-                ))}
+
+                  {editMode === 'color' && (
+                    <View style={{ height: 160, marginTop: 4, borderWidth: 1, borderColor: theme.border, borderRadius: 12, backgroundColor: theme.surfaceAlt, overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 2 }}>
+                      <ScrollView nestedScrollEnabled contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 8, justifyContent: 'center' }}>
+                        {TAG_COLOR_PALETTE.map((color) => (
+                          <TouchableOpacity
+                            key={color}
+                            onPress={() => { setEditColor(color); setEditMode('main'); }}
+                            style={{ width: '50%', padding: 6, alignItems: 'center' }}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: color, borderWidth: editColor === color ? 3 : 1, borderColor: editColor === color ? theme.text : 'rgba(255,255,255,0.1)' }} />
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ flex: 1, zIndex: editMode === 'icon' ? 20 : 1 }}>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Icon</Text>
+                  <TouchableOpacity onPress={() => setEditMode(editMode === 'icon' ? 'main' : 'icon')} style={[styles.modalInput, { alignItems: 'center', justifyContent: 'center', borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+                    <Feather name={editIcon} size={20} color={theme.text} />
+                  </TouchableOpacity>
+
+                  {editMode === 'icon' && (
+                    <View style={{ height: 160, marginTop: 4, borderWidth: 1, borderColor: theme.border, borderRadius: 12, backgroundColor: theme.surfaceAlt, overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 2 }}>
+                      <ScrollView nestedScrollEnabled contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 8, justifyContent: 'center' }}>
+                        {TAG_ICON_PRESETS.map((iconName) => (
+                          <TouchableOpacity
+                            key={iconName}
+                            onPress={() => { setEditIcon(iconName); setEditMode('main'); }}
+                            style={{ width: '50%', padding: 6, alignItems: 'center' }}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: editIcon === iconName ? 2 : 1, borderColor: editIcon === iconName ? theme.accent : theme.border, backgroundColor: editIcon === iconName ? `${theme.accent}22` : 'transparent' }}>
+                               <Feather name={iconName} size={16} color={theme.text} />
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
               </View>
 
-              <Text style={[styles.label, { color: theme.textMuted, marginTop: 14 }]}>Naming format</Text>
-              <TextInput
+              <Text style={[styles.label, { color: theme.textMuted, marginTop: 4 }]}>Naming format</Text>
+              <TemplateChipEditor
                 value={editTemplate}
-                onChangeText={setEditTemplate}
-                style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
-                placeholder="{tag} <count>"
-                placeholderTextColor={theme.textMuted}
+                onChange={setEditTemplate}
+                availableTokens={[
+                  { token: '{tag}', label: 'Tag' },
+                  { token: '<count>', label: 'Count' },
+                  { token: '<date:DD-MM-YYYY>', label: 'Date' },
+                  { token: '<time:hh:mm>', label: 'Time' },
+                ]}
               />
-              <Text style={[styles.hint, { color: theme.textMuted }]}>
-                Tokens: {'{tag}'}, {'<count>'}, {'<date:PATTERN>'}, {'<time:PATTERN>'}. Tap a preset below to insert it.
-              </Text>
 
-              <Text style={[styles.presetLabel, { color: theme.textMuted }]}>DATE FORMAT</Text>
-              <View style={styles.presetWrap}>
-                {DATE_FORMAT_PRESETS.map((p) => (
-                  <TouchableOpacity
-                    key={p.key}
-                    onPress={() => insertDateFormat(p.pattern)}
-                    style={[styles.presetChip, { borderColor: theme.border }]}
-                  >
-                    <Text style={{ color: theme.text, fontSize: 12 }}>{p.key}</Text>
-                  </TouchableOpacity>
-                ))}
+              <Text style={[styles.label, { color: theme.textMuted, marginTop: 14, marginBottom: 8 }]}>Preview</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12, padding: 12, backgroundColor: theme.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, backgroundColor: `${editColor}22`, borderColor: editColor, borderWidth: 1 }}>
+                  <Feather name={editIcon} size={12} color={editColor} style={{ marginRight: 4 }} />
+                  <Text style={{ color: editColor, fontSize: 12, fontWeight: '700' }}>{editName || 'Tag'}</Text>
+                </View>
+                <Text style={{ color: theme.text, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                  {renderTemplate(editTemplate, { tag: editName || 'Tag', count: previewCount })}.m4a
+                </Text>
               </View>
-
-              <Text style={[styles.presetLabel, { color: theme.textMuted, marginTop: 14 }]}>TIME FORMAT</Text>
-              <View style={styles.presetWrap}>
-                {TIME_FORMAT_PRESETS.map((p) => (
-                  <TouchableOpacity
-                    key={p.key}
-                    onPress={() => insertTimeFormat(p.pattern)}
-                    style={[styles.presetChip, { borderColor: theme.border }]}
-                  >
-                    <Text style={{ color: theme.text, fontSize: 12 }}>{p.key}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.hint, { color: theme.textMuted, marginTop: 14 }]}>
-                Preview: {renderTemplate(editTemplate, { tag: editName, count: previewCount })}
-              </Text>
 
               <View style={styles.row}>
                 <TouchableOpacity style={[styles.btn, { backgroundColor: theme.surfaceAlt }]} onPress={() => setEditTarget(null)}>
@@ -285,7 +290,8 @@ const styles = StyleSheet.create({
   catAction: { marginLeft: 10, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   editCard: { width: '88%', maxHeight: '80%', borderRadius: 16, padding: 20 },
-  editTitle: { fontSize: 17, fontWeight: '700', marginBottom: 16 },
+  editTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   modalInput: { borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, fontSize: 15 },
   hint: { fontSize: 12, marginTop: 6, lineHeight: 17 },

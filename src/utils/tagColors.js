@@ -30,14 +30,14 @@ export const TAG_ICON_PRESETS = [
 	'message-circle',
 	'mic',
 	'edit-3',
-	'lightbulb',
+	'zap',
 	'moon',
 	'sun',
-	'zap',
+	'cloud',
 	'target',
 	'heart',
 	'cpu',
-	'leaf',
+	'feather',
 	'headphones',
 	'map-pin',
 	'star',
@@ -45,6 +45,34 @@ export const TAG_ICON_PRESETS = [
 	'activity',
 	'smile',
 	'award',
+	'coffee',
+	'music',
+	'film',
+	'camera',
+	'globe',
+	'home',
+	'briefcase',
+	'dollar-sign',
+	'trending-up',
+	'users',
+	'user',
+	'flag',
+	'bell',
+	'shopping-bag',
+	'layers',
+	'code',
+	'pen-tool',
+	'anchor',
+	'compass',
+	'clock',
+	'eye',
+	'gift',
+	'radio',
+	'slack',
+	'tag',
+	'thumbs-up',
+	'umbrella',
+	'wind',
 ];
 
 // Untagged is deliberately neutral/grey so it never gets confused with an actual tag's
@@ -73,5 +101,7 @@ export function colorForCategory(category) {
 }
 
 export function iconForCategory(category) {
-	return category?.icon || DEFAULT_TAG_ICON;
+	const icon = category?.icon;
+	if (icon && /^[a-z\-]+$/.test(icon)) return icon;
+	return DEFAULT_TAG_ICON;
 }

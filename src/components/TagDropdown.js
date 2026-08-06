@@ -45,13 +45,13 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
           {value ? (
             <>
               <View style={[styles.dot, { backgroundColor: colorForCategory(value) }]} />
-              <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(value)}</Text>
+              <Feather name={iconForCategory(value)} size={16} color={theme.text} style={{ marginRight: 8 }} />
               <Text style={{ color: theme.text, fontSize: 15 }}>{value.name}</Text>
             </>
           ) : (
             <>
               <View style={[styles.dot, { backgroundColor: UNTAGGED_COLOR }]} />
-              <Text style={{ fontSize: 16, marginRight: 8 }}>{UNTAGGED_ICON}</Text>
+              <Feather name={UNTAGGED_ICON} size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
               <Text style={{ color: theme.textMuted, fontSize: 15 }}>Untagged (choose a tag...)</Text>
             </>
           )}
@@ -76,7 +76,7 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
 
             <TouchableOpacity onPress={() => select(null)} style={styles.option}>
               <View style={[styles.dot, { backgroundColor: UNTAGGED_COLOR }]} />
-              <Text style={{ fontSize: 16, marginRight: 8 }}>{UNTAGGED_ICON}</Text>
+              <Feather name={UNTAGGED_ICON} size={16} color={theme.textMuted} style={{ marginRight: 8 }} />
               <Text style={{ color: theme.textMuted }}>Untagged</Text>
             </TouchableOpacity>
 
@@ -87,7 +87,7 @@ export default function TagDropdown({ label, value, categories, onChange, onCrea
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => select(item)} style={styles.option}>
                   <View style={[styles.dot, { backgroundColor: colorForCategory(item) }]} />
-                  <Text style={{ fontSize: 16, marginRight: 8 }}>{iconForCategory(item)}</Text>
+                  <Feather name={iconForCategory(item)} size={16} color={theme.text} style={{ marginRight: 8 }} />
                   <Text style={{ color: theme.text }}>{item.name}</Text>
                 </TouchableOpacity>
               )}

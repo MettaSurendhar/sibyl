@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { compressAndSplitForTranscription } from '../audio/ffmpegModule';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 // whisper-large-v3-turbo: fastest + cheapest on Groq's free tier, plenty accurate for journaling.
@@ -119,21 +120,8 @@ function buildParagraphs(segments) {
 	return paragraphs.join('\n\n');
 }
 
-// Transcribes a single local audio file. Requires internet + a Groq API key (Settings screen).
-// Throws with a readable message on failure (bad key, no internet, rate limit, file too large).
-// Returns { text, language }.
-export async function transcribeFile(uri, apiKey) {
-	if (!apiKey) throw new Error('No Groq API key set. Add one in Settings.');
-
-	const info = await FileSystem.getInfoAsync(uri);
-	if (!info.exists) throw new Error('Audio file not found.');
-	// Groq's free tier caps uploads around 25MB per request.
-	if (info.size > 24 * 1024 * 1024) {
-		throw new Error(
-			'Recording is too large for one transcription request (25MB limit).',
-		);
-	}
-
+// Transcribes a single chunk of audio (already guaranteed to be <25MB by ffmpeg chunking).
+async function transcribeSingleChunk(uri, apiKey) {
 	const form = new FormData();
 	form.append('file', {
 		uri,
@@ -171,6 +159,35 @@ export async function transcribeFile(uri, apiKey) {
 			? buildParagraphs(data.segments)
 			: (data.text || '').trim();
 	return { text, language: data.language || '' };
+}
+
+// Transcribes a local audio file. Requires internet + a Groq API key (Settings screen).
+// Automatically compresses and chunks large files to fit within Groq's 25MB limits.
+// Returns { text, language }.
+export async function transcribeFile(uri, apiKey) {
+	if (!apiKey) throw new Error('No Groq API key set. Add one in Settings.');
+
+	const info = await FileSystem.getInfoAsync(uri);
+	if (!info.exists) throw new Error('Audio file not found.');
+
+	// Compress to 16kHz 32kbps mono AAC and split into 1-hour chunks safely
+	const { chunkUris, chunkDir } = await compressAndSplitForTranscription(uri);
+	
+	try {
+		const parts = [];
+		let language = '';
+		
+		for (const chunkUri of chunkUris) {
+			const result = await transcribeSingleChunk(chunkUri, apiKey);
+			if (result.text) parts.push(result.text);
+			if (!language && result.language) language = result.language;
+		}
+		
+		return { text: parts.join('\n\n'), language };
+	} finally {
+		// Always clean up the temporary chunks, even on error
+		await FileSystem.deleteAsync(chunkDir, { idempotent: true });
+	}
 }
 
 // For multi-segment entries (legacy append model — new Trim/Merge/Append operations always

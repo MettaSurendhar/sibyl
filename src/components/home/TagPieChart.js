@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import Text from '../../theme/Text';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
+import { Feather } from '@expo/vector-icons';
 
 const SIZE = 170;
 const RADIUS = SIZE / 2;
@@ -81,11 +82,12 @@ export default function TagPieChart({ slices, width }) {
 						style={styles.legendItem}
 					>
 						<View style={[styles.legendDot, { backgroundColor: a.color }]} />
+						<Feather name={a.icon} size={14} color={theme.text} style={{ marginRight: 6 }} />
 						<Text
 							style={[styles.legendText, { color: theme.text }]}
 							numberOfLines={1}
 						>
-							{a.icon} {a.name} · {a.count}
+							{a.name} · {a.count}
 						</Text>
 					</View>
 				))}

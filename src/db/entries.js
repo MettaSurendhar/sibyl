@@ -7,6 +7,7 @@ import {
 } from '../utils/externalFolder';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import { emitDbUpdated } from '../utils/events';
 
 // Best-effort mirror of a finished recording into the user's chosen external folder (Settings ->
 // Saving folder), if one is configured. The app's own internal copy (in FileSystem storage) stays
@@ -62,7 +63,7 @@ export async function syncWithFolder(folderUri, onProgress) {
 	try {
 		const filesInFolder = await SAF.readDirectoryAsync(folderUri);
 		const existingSegments = await db.getAllAsync(`
-			SELECT s.id, s.uri, s.externalUri, s.entryId, e.title 
+			SELECT s.id, s.uri, s.externalUri, s.entryId, e.title, e.createdAt 
 			FROM segments s
 			JOIN entries e ON e.id = s.entryId
 		`);
@@ -82,19 +83,27 @@ export async function syncWithFolder(folderUri, onProgress) {
 		if (totalSteps === 0) return { pushed: 0, pulled: 0, failed: 0, total: 0 };
 
 		// --- Execute PUSH ---
+		// Build a manifest of all entries being exported so dates survive
+		const manifestEntries = {};
 		for (const seg of toPush) {
 			try {
 				const ext = (seg.uri.split('.').pop() || 'm4a').split('?')[0];
 				const safeTitle = (seg.title || 'recording').replace(/[\\/:*?"<>|]/g, '_').trim() || 'recording';
-				
+				const exportFilename = `${safeTitle}.${ext}`;
+
 				const newExternalUri = await copyFileToFolder(
 					folderUri,
 					seg.uri,
-					`${safeTitle}.${ext}`,
+					exportFilename,
 					`audio/${ext}`
 				);
 				if (newExternalUri) {
 					await db.runAsync('UPDATE segments SET externalUri = ? WHERE id = ?', [newExternalUri, seg.id]);
+					// Store in manifest keyed by clean filename
+					manifestEntries[exportFilename] = {
+						title: seg.title,
+						createdAt: seg.createdAt,
+					};
 				}
 				pushed++;
 			} catch (e) {
@@ -104,18 +113,79 @@ export async function syncWithFolder(folderUri, onProgress) {
 			if (onProgress) onProgress({ done: currentStep, total: totalSteps, phase: 'exporting' });
 		}
 
+		// Write the manifest. We merge with any existing manifest in the folder
+		// so repeated syncs accumulate entries rather than overwriting old ones.
+		const MANIFEST_NAME = 'sibyl_manifest.json';
+		let existingManifest = {};
+		try {
+			const manifestUri = filesInFolder.find(u => {
+				const decoded = decodeURIComponent(u);
+				return decoded.endsWith(MANIFEST_NAME);
+			});
+			if (manifestUri) {
+				const raw = await FileSystem.readAsStringAsync(manifestUri);
+				existingManifest = JSON.parse(raw);
+			}
+		} catch (_) {}
+
+		const mergedManifest = { ...existingManifest, ...manifestEntries };
+		if (Object.keys(mergedManifest).length > 0) {
+			try {
+				const manifestContent = JSON.stringify(mergedManifest, null, 2);
+				// Delete old manifest first (SAF can't overwrite)
+				const oldManifestUri = filesInFolder.find(u => {
+					const decoded = decodeURIComponent(u);
+					return decoded.endsWith(MANIFEST_NAME);
+				});
+				if (oldManifestUri) {
+					try { await FileSystem.deleteAsync(oldManifestUri); } catch (_) {}
+				}
+				const newManifestUri = await SAF.createFileAsync(folderUri, MANIFEST_NAME, 'application/json');
+				await FileSystem.writeAsStringAsync(newManifestUri, manifestContent);
+			} catch (_) {}
+		}
+
 		// --- Execute PULL ---
 		const internalDir = FileSystem.documentDirectory + 'recordings/';
 		await FileSystem.makeDirectoryAsync(internalDir, { intermediates: true }).catch(() => {});
 
+		// Read manifest first so we can look up original dates by filename
+		let manifest = {};
+		try {
+			// Re-read the file list to include the manifest we just wrote
+			const freshFiles = await SAF.readDirectoryAsync(folderUri);
+			const manifestUri = freshFiles.find(u => {
+				const decoded = decodeURIComponent(u);
+				return decoded.endsWith(MANIFEST_NAME);
+			});
+			if (manifestUri) {
+				const raw = await FileSystem.readAsStringAsync(manifestUri);
+				manifest = JSON.parse(raw);
+			}
+		} catch (_) {}
+
 		for (const safUri of toPull) {
 			try {
+				// Decode filename from SAF URI
 				const decoded = decodeURIComponent(safUri);
-				const filename = decoded.split('/').pop() || `imported_${Date.now()}.mp3`;
-				// Ensure safe internal filename
-				const safeFilename = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-				const internalUri = internalDir + Date.now() + '_' + safeFilename;
-				
+				const realPath = decoded.includes(':') ? decoded.split(':').pop() : decoded;
+				const rawFilename = realPath.split('/').pop() || `imported_${Date.now()}`;
+
+				// Lookup metadata from manifest (keyed by filename)
+				const meta = manifest[rawFilename];
+
+				// Use manifest date if available; otherwise fall back to now
+				const fileTimestampMs = (meta && meta.createdAt) ? meta.createdAt : Date.now();
+
+				// Use manifest title if available; otherwise derive from filename
+				let title = meta?.title 
+					|| rawFilename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ').trim()
+					|| rawFilename;
+
+				// Copy file into internal storage
+				const safeFilename = rawFilename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+				const internalUri = internalDir + fileTimestampMs + '_' + safeFilename;
+
 				try {
 					await FileSystem.copyAsync({ from: safUri, to: internalUri });
 				} catch {
@@ -123,29 +193,29 @@ export async function syncWithFolder(folderUri, onProgress) {
 					await FileSystem.writeAsStringAsync(internalUri, b64, { encoding: 'base64' });
 				}
 
+				// Probe audio duration
 				const { sound, status } = await Audio.Sound.createAsync({ uri: internalUri });
 				const durationMs = status.durationMillis || 0;
 				await sound.unloadAsync();
 
+				// Write to DB using the real source timestamps from manifest
 				const entryId = newId('ent');
-				const title = filename.replace(/\.[^/.]+$/, ""); // strip extension for the title
-				const now = Date.now();
 				const waveform = JSON.stringify(generateDummyWaveform());
 
 				await db.runAsync(
 					'INSERT INTO entries (id, title, createdAt, updatedAt, totalDurationMs, waveform) VALUES (?, ?, ?, ?, ?, ?)',
-					[entryId, title, now, now, durationMs, waveform]
+					[entryId, title, fileTimestampMs, fileTimestampMs, durationMs, waveform]
 				);
 
 				const segId = newId('seg');
 				await db.runAsync(
 					'INSERT INTO segments (id, entryId, uri, externalUri, durationMs, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?)',
-					[segId, entryId, internalUri, safUri, durationMs, now]
+					[segId, entryId, internalUri, safUri, durationMs, fileTimestampMs]
 				);
-				
+
 				pulled++;
 			} catch (e) {
-				console.error("Failed to pull", safUri, e);
+				console.error('Failed to pull', safUri, e);
 				failed++;
 			}
 			currentStep++;
@@ -156,6 +226,7 @@ export async function syncWithFolder(folderUri, onProgress) {
 		console.error("Sync error:", e);
 	}
 	
+	emitDbUpdated();
 	return { pushed, pulled, failed, total: totalSteps };
 }
 
@@ -228,6 +299,7 @@ export async function saveTranscript(entryId, text, status = 'done') {
 		`UPDATE entries SET transcript = ?, transcriptStatus = ?, updatedAt = ? WHERE id = ?`,
 		[text, status, Date.now(), entryId]
 	);
+	emitDbUpdated();
 }
 
 export async function listEntries() {
@@ -309,6 +381,7 @@ export async function createEntry({
 			]);
 		}
 	});
+	emitDbUpdated();
 	return id;
 }
 
@@ -344,6 +417,7 @@ export async function appendSegment(entryId, { uri, durationMs, waveform }) {
 			]);
 		}
 	});
+	emitDbUpdated();
 }
 
 // Used after a trim/merge/append operation produces one real consolidated audio file:
@@ -375,6 +449,7 @@ export async function replaceSegments(entryId, { uri, durationMs, waveform }) {
 			entryId,
 		],
 	);
+	emitDbUpdated();
 }
 
 export async function renameEntry(id, title) {
@@ -383,6 +458,7 @@ export async function renameEntry(id, title) {
 		'UPDATE entries SET title = ?, updatedAt = ? WHERE id = ?',
 		[title, Date.now(), id],
 	);
+	emitDbUpdated();
 }
 
 export async function setEntryCategory(id, categoryId, newTitle) {
@@ -391,6 +467,7 @@ export async function setEntryCategory(id, categoryId, newTitle) {
 		'UPDATE entries SET categoryId = ?, title = ?, updatedAt = ? WHERE id = ?',
 		[categoryId, newTitle, Date.now(), id],
 	);
+	emitDbUpdated();
 }
 
 export async function setTranscript(id, transcript, language) {
@@ -399,6 +476,7 @@ export async function setTranscript(id, transcript, language) {
 		'UPDATE entries SET transcript = ?, transcriptStatus = ?, transcriptLanguage = ? WHERE id = ?',
 		[transcript, 'done', language || null, id],
 	);
+	emitDbUpdated();
 }
 
 export async function setTranscriptStatus(id, status) {
@@ -407,6 +485,7 @@ export async function setTranscriptStatus(id, status) {
 		status,
 		id,
 	]);
+	emitDbUpdated();
 }
 
 // Returns the mirrored-copy URIs (skipping segments that were never mirrored) for the given
@@ -538,4 +617,5 @@ export async function deleteEntries(ids, { alsoDeleteExternal = false } = {}) {
 		await db.runAsync('DELETE FROM entries WHERE id = ?', [id]);
 		await db.runAsync('DELETE FROM segments WHERE entryId = ?', [id]);
 	}
+	emitDbUpdated();
 }

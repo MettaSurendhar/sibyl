@@ -8,17 +8,17 @@ export const themes = {
     surface: '#132038',      // slightly lighter navy for cards/sheets
     surfaceAlt: '#1A2E50',   // mid-navy for selected/hover surfaces
     border: '#243D60',       // subtle blue-navy border
-    text: '#F0F4FF',         // bright white-blue — primary readable text
-    textSecondary: '#C8DAEE',// soft blue-white — for labels, subtitles
-    textMuted: '#7A99BB',    // desaturated blue-grey for secondary/muted text
-    accent: '#C9A458',       // rich gold — the logo ring & lettering gold
+    text: '#EEF2FF',         // warm near-white — primary headings, titles, key data
+    textSecondary: '#A8C0D6',// cool silver-blue — subtitles, labels, secondary info
+    textMuted: '#5E7A96',    // steel-blue — timestamps, hints, placeholder, tertiary info
+    accent: '#fbd471ff',       // rich gold — the logo ring & lettering gold
     accentDeep: '#A07C30',   // deeper gold for pressed states
     teal: '#2ABCCE',         // cerulean teal — the hair highlight color
     tealDeep: '#1A8A9A',     // deeper teal for secondary teal elements
     danger: '#E07070',       // muted red for destructive actions
     success: '#5DC4A8',      // teal-green for success states
     waveform: '#2ABCCE',     // teal when idle
-    waveformRecording: '#C9A458', // gold when actively recording
+    waveformRecording: '#f7d377ff', // gold when actively recording
     waveformMuted: '#1A2E50',// muted waveform bg
   },
 

@@ -1,9 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, StyleSheet, Animated, Easing, PanResponder } from 'react-native';
 import Text from '../theme/Text';
 
 const SAMPLE_INTERVAL_MS = 100;
 const MAX_BARS = 60;
+// Cap on bars actually rendered in the scrolling playback track.
+// A 1-hour recording = 36,000 samples — rendering all as Views hangs the screen for seconds.
+// We downsample to this many bars; each bar represents a chunk of real samples.
+const MAX_RENDER_BARS = 800;
 
 function formatMs(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -12,15 +16,9 @@ function formatMs(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-// If the stored waveform is shorter than the audio's real duration (can happen after an
-// edit operation touches duration/waveform slightly out of step), pad the tail with silence
-// so the track always visually spans its full length instead of cutting off partway through.
-function padToFullDuration(waveform, totalDurationMs) {
-  const expectedSamples = Math.ceil((totalDurationMs || 0) / SAMPLE_INTERVAL_MS);
-  if (waveform.length >= expectedSamples) return waveform;
-  return waveform.concat(Array(expectedSamples - waveform.length).fill(-60));
-}
+// padToFullDuration removed - padding is now handled implicitly during windowing lookup
 
+// Downsample removed - we use windowing now to prevent squishing the timeline width
 // Scrolling ruler synced to the live waveform: a labeled mm:ss tick every second,
 // with fine unlabeled ticks every ~100ms in between.
 // IMPORTANT: ticks are keyed off the sample INDEX (deterministic, one new sample every ~100ms),
@@ -48,10 +46,6 @@ export function WaveformRuler({ sampleCount, barWidth = 3, gap = 2 }) {
   );
 }
 
-// Moving playback TRACK: ruler ticks + waveform bars share exactly one Animated.Value, so they
-// scroll in perfect lockstep under a fixed center playhead - the same motion language as the
-// live recording waveform (which also scrolls, just append-driven instead of position-driven).
-// Single-color only: played = color, not-yet-played/silent = mutedColor (grey). No peak tier.
 export function ScrollingPlaybackTrack({
   waveform,
   positionMs,
@@ -71,10 +65,13 @@ export function ScrollingPlaybackTrack({
   const dragLatestIndexRef = useRef(0);
   const slotWidth = barWidth + gap;
   const waveHeight = height - 30; // reserve top ~30px for the ruler row
-  const displayWaveform = padToFullDuration(waveform, totalDurationMs);
+
+  // Always use the real physical width so the ruler ticks are spaced correctly
+  const totalSamples = Math.max(waveform.length, Math.ceil((totalDurationMs || 0) / SAMPLE_INTERVAL_MS));
+  const fullWidth = totalSamples * slotWidth;
 
   const indexForMs = (ms) => ms / SAMPLE_INTERVAL_MS;
-  const targetForIndex = (idx) => containerWidth / 2 - idx * slotWidth - slotWidth / 2;
+  const targetForIndex = (idx) => (containerWidth / 2) - (idx * slotWidth) - (slotWidth / 2);
 
   useEffect(() => {
     if (draggingRef.current || !containerWidth) return;
@@ -109,13 +106,27 @@ export function ScrollingPlaybackTrack({
   ).current;
 
   const currentIndex = Math.round(positionMs / SAMPLE_INTERVAL_MS);
-  const totalSamples = Math.max(displayWaveform.length, Math.ceil(totalDurationMs / SAMPLE_INTERVAL_MS));
 
-  // Ruler ticks span the same index range as the waveform bars, one tick per bar slot,
-  // a labeled mm:ss every ~1s (every 10 samples).
-  const ticks = [];
-  for (let i = 0; i < totalSamples; i++) {
-    if (i % 10 === 0) ticks.push({ index: i, t: i * SAMPLE_INTERVAL_MS });
+  // WINDOWING: only render the bars and ticks that are currently visible on screen.
+  // This completely eliminates React render lag (rendering 100 views instead of 800-20,000 views).
+  const visibleBarsCount = containerWidth ? Math.ceil(containerWidth / slotWidth) : 0;
+  // Add a buffer of half a screen on each side to ensure smooth scrolling
+  const buffer = Math.floor(visibleBarsCount / 2);
+  const visibleStart = Math.max(0, currentIndex - visibleBarsCount / 2 - buffer);
+  const visibleEnd = Math.min(totalSamples, currentIndex + visibleBarsCount / 2 + buffer);
+
+  const visibleTicks = [];
+  for (let i = Math.floor(visibleStart / 10) * 10; i <= visibleEnd; i += 10) {
+    if (i >= 0 && i < totalSamples) visibleTicks.push({ index: i, t: i * SAMPLE_INTERVAL_MS });
+  }
+
+  const visibleBars = [];
+  for (let i = Math.floor(visibleStart); i <= Math.ceil(visibleEnd); i++) {
+    if (i >= 0 && i < totalSamples) {
+      // Implicitly pad with silence (-60) if the waveform array is shorter than totalDurationMs
+      const db = i < waveform.length ? waveform[i] : -60;
+      visibleBars.push({ index: i, db });
+    }
   }
 
   return (
@@ -124,10 +135,10 @@ export function ScrollingPlaybackTrack({
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
       {...panResponder.panHandlers}
     >
-      <View pointerEvents="none" style={[styles.playhead, { left: containerWidth / 2 - 1, height, backgroundColor: color }]} />
+      <View pointerEvents="none" style={[styles.playhead, { left: containerWidth / 2 - 1, height, backgroundColor: color, zIndex: 10 }]} />
 
-      <Animated.View style={{ height: 26, transform: [{ translateX }] }}>
-        {ticks.map(({ index, t }) => (
+      <Animated.View style={{ height: 26, width: fullWidth, transform: [{ translateX }] }}>
+        {visibleTicks.map(({ index, t }) => (
           <Text
             key={index}
             style={[
@@ -140,18 +151,20 @@ export function ScrollingPlaybackTrack({
         ))}
       </Animated.View>
 
-      <Animated.View style={[styles.row, { height: waveHeight, transform: [{ translateX }] }]}>
-        {displayWaveform.map((db, i) => {
+      <Animated.View style={[styles.row, { height: waveHeight, width: fullWidth, transform: [{ translateX }] }]}>
+        {visibleBars.map(({ index, db }) => {
           const clamped = Math.max(-60, Math.min(0, db));
           const h = Math.max(3, ((clamped + 60) / 60) * waveHeight);
-          const played = i <= currentIndex;
+          const played = index <= currentIndex;
           return (
             <View
-              key={i}
+              key={index}
               style={{
+                position: 'absolute',
+                left: index * slotWidth + (gap / 2),
                 width: barWidth,
-                marginHorizontal: gap / 2,
                 height: h,
+                top: (waveHeight - h) / 2, // vertically center the bar
                 borderRadius: barWidth / 2,
                 backgroundColor: played ? color : mutedColor,
               }}
@@ -228,11 +241,13 @@ export function LiveWaveform({ samples, color, height = 90, barWidth = 3, gap = 
 
 // Static waveform for an entry row / trim minimap, drawn from stored samples, with a progress wipe.
 export function StaticWaveform({ waveform, progress = 0, color, mutedColor, totalDurationMs, height = 60, barWidth = 3, gap = 2 }) {
-  const source = totalDurationMs ? padToFullDuration(waveform, totalDurationMs) : waveform;
+  const sourceLength = Math.max(waveform.length, Math.ceil((totalDurationMs || 0) / SAMPLE_INTERVAL_MS));
   const maxBars = 80;
-  const step = Math.max(1, Math.floor(source.length / maxBars));
+  const step = Math.max(1, Math.floor(sourceLength / maxBars));
   const bars = [];
-  for (let i = 0; i < source.length; i += step) bars.push(source[i]);
+  for (let i = 0; i < sourceLength; i += step) {
+    bars.push(i < waveform.length ? waveform[i] : -60);
+  }
 
   return (
     <View style={[styles.row, { height }]}>

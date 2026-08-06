@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useCallback, useState, useEffect } from 'react';
+import { View, Image, TouchableOpacity, ScrollView, StyleSheet, DeviceEventEmitter } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { getAllTagCounts, getPieBreakdown } from '../db/categories';
 import { getPrefs } from '../utils/settingsStore';
 import { getStreakCount, getDailyEntryCounts, getAnalyticsSummary } from '../db/entries';
+import { DB_UPDATED_EVENT } from '../utils/events';
 import TagCountBoxes from '../components/home/TagCountBoxes';
 import Typewriter from '../components/home/Typewriter';
 
@@ -23,21 +24,21 @@ const COMPANION_PHRASES = [
 
 function generateSmartActivityText(streak, stats) {
 	if (!stats || stats.totalEntries === 0) return "Welcome to Sibyl. Start by recording your first entry.";
-	
+
 	const options = [];
-	
+
 	if (streak > 2) {
 		options.push(`You have a ${streak} day streak going. Keep it up!`);
 		options.push(`Keep the momentum. Your ${streak} day streak is active.`);
 	} else if (streak === 0 && stats.totalEntries > 0) {
 		options.push("You took a break. Let's start fresh today.");
 	}
-	
+
 	if (stats.avgEntryLength > 0) {
 		const mins = Math.max(1, Math.round(stats.avgEntryLength / 60000));
 		options.push(`Your average thought lasts about ${mins} minute${mins === 1 ? '' : 's'}.`);
 	}
-	
+
 	if (stats.timeOfDay && stats.totalEntries > 5) {
 		let max = 0, best = '';
 		for (const [k, v] of Object.entries(stats.timeOfDay)) {
@@ -47,11 +48,11 @@ function generateSmartActivityText(streak, stats) {
 			options.push(`You record most of your thoughts in the ${best}.`);
 		}
 	}
-	
+
 	if (options.length === 0) {
 		options.push(`You've recorded ${stats.totalEntries} thoughts so far.`);
 	}
-	
+
 	const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
 	return options[dayOfYear % options.length];
 }
@@ -62,8 +63,8 @@ function getGreeting(name) {
 	if (h >= 12 && h < 17) timeStr = 'Good afternoon';
 	else if (h >= 17 && h < 22) timeStr = 'Good evening';
 	else if (h >= 22 || h < 5) timeStr = 'Welcome back';
-	
-	return name ? `${timeStr}, ${name}` : timeStr;
+	// Return as { base, name } so the name can be styled separately
+	return { base: timeStr, name: name || '' };
 }
 
 export default function TodayScreen({ navigation, onTagPress }) {
@@ -85,7 +86,7 @@ export default function TodayScreen({ navigation, onTagPress }) {
 		]).then(([tags, prefs, streak, stats]) => {
 			setTagCounts(tags);
 			if (prefs.userName) setUserName(prefs.userName);
-			
+
 			const dayOfYear = Math.floor((now - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
 			setCompanionPhrase(COMPANION_PHRASES[dayOfYear % COMPANION_PHRASES.length]);
 			setSmartActivityText(generateSmartActivityText(streak, stats));
@@ -98,32 +99,28 @@ export default function TodayScreen({ navigation, onTagPress }) {
 		}, [refresh]),
 	);
 
+	// Also refresh whenever any DB write happens (e.g. transcription completes, sync finishes)
+	useEffect(() => {
+		const sub = DeviceEventEmitter.addListener(DB_UPDATED_EVENT, refresh);
+		return () => sub.remove();
+	}, [refresh]);
+
+
 	return (
 		<ScrollView
 			style={[styles.container, { backgroundColor: theme.bg }]}
 			contentContainerStyle={{
-				paddingTop: insets.top + 20,
+				paddingTop: insets.top + 6,
 				paddingBottom: insets.bottom + 16,
 			}}
 			showsVerticalScrollIndicator={false}
 		>
-			{/* Header: Greeting + Settings icon */}
+			{/* Header: Logo + Settings */}
 			<View style={styles.headerRow}>
-				<View style={{ flex: 1, marginRight: 16 }}>
-					<Text 
-						style={{ 
-							fontFamily: 'DancingScript_700Bold', 
-							fontSize: 32, 
-							color: theme.text,
-							lineHeight: 40
-						}}
-					>
-						{getGreeting(userName)}
-					</Text>
-					<Text style={{ color: theme.textMuted, fontSize: 14, marginTop: 4 }}>
-						{companionPhrase}
-					</Text>
-				</View>
+				<Image
+					source={require('../../assets/header-icon.png')}
+					style={{ width: 180, height: 56, resizeMode: 'contain', marginLeft: -18 }}
+				/>
 				<View style={styles.headerRight}>
 					<TouchableOpacity
 						onPress={() => navigation.navigate('Analytics')}
@@ -142,6 +139,38 @@ export default function TodayScreen({ navigation, onTagPress }) {
 				</View>
 			</View>
 
+			{/* Greeting */}
+			<View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+				<Text
+					style={{
+						fontFamily: 'DancingScript_700Bold',
+						fontSize: 26,
+						color: theme.text,
+						lineHeight: 34
+					}}
+				>
+					{(() => {
+						const { base, name } = getGreeting(userName);
+						return name ? (
+							<>
+								{base + ', '}
+								<Text style={{ color: theme.accent, fontFamily: 'DancingScript_700Bold' }}>{name}</Text>
+							</>
+						) : base;
+					})()}
+				</Text>
+				<Text
+					style={{
+						fontFamily: 'DancingScript_700Bold',
+						fontSize: 17,
+						color: theme.textMuted,
+						marginTop: 2
+					}}
+				>
+					{companionPhrase}
+				</Text>
+			</View>
+
 			{/* Tag count boxes */}
 			<TagCountBoxes tags={tagCounts} onTagPress={onTagPress} />
 
@@ -149,9 +178,9 @@ export default function TodayScreen({ navigation, onTagPress }) {
 			{smartActivityText ? (
 				<View style={[styles.activityBox, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
 					<Feather name='activity' size={16} color={theme.accent} style={{ marginRight: 10, marginTop: 2 }} />
-					<Typewriter 
-						text={smartActivityText} 
-						delay={40} 
+					<Typewriter
+						text={smartActivityText}
+						delay={40}
 						style={{ flex: 1, fontSize: 13, lineHeight: 18, color: theme.text }}
 					/>
 				</View>
@@ -164,11 +193,12 @@ const styles = StyleSheet.create({
 	container: { flex: 1 },
 	headerRow: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
+		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: 20,
-		marginBottom: 24,
+		marginBottom: 20,
 	},
+	headerTitle: { fontSize: 22, fontWeight: '700' },
 	headerRight: { flexDirection: 'row', alignItems: 'center' },
 	headerBtn: {
 		width: 36,

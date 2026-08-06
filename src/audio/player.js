@@ -138,9 +138,19 @@ export function createPlayer({ segments, onStatus }) {
       if (clamped < acc + segments[idx].durationMs) break;
       acc += segments[idx].durationMs;
     }
+    
+    const segmentPosMs = clamped - acc;
+    
+    // If we're already playing the target segment, just seek the existing player
+    // This avoids unloading and reloading a massive file just to change position.
+    if (sound && idx === currentIndex) {
+      await safely(() => sound.setPositionAsync(segmentPosMs));
+      return;
+    }
+
     const priorStatus = sound ? await safely(() => sound.getStatusAsync()) : null;
     const wasPlaying = priorStatus?.isLoaded ? priorStatus.isPlaying : false;
-    await loadSegment(idx, clamped - acc);
+    await loadSegment(idx, segmentPosMs);
     if (wasPlaying) await play();
   }
 

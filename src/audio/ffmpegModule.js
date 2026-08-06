@@ -66,3 +66,29 @@ export async function concatFiles(inputUris) {
 
   return { uri: outputUri };
 }
+
+// Compresses an audio file to 16kHz mono 32kbps AAC (ideal for Whisper APIs) and splits it into
+// 1-hour chunks. This drastically reduces file size (~14MB/hour) and guarantees we never hit
+// the Groq 25MB per-request upload limit, even for huge files.
+export async function compressAndSplitForTranscription(inputUri) {
+  // Use a dedicated folder for these temporary chunks to easily clean them up
+  const chunkDir = `${FileSystem.cacheDirectory}transcribe_chunks_${Date.now()}/`;
+  await FileSystem.makeDirectoryAsync(chunkDir, { intermediates: true });
+  
+  // segment_time 3600 splits into 1 hour chunks
+  const command = `-y -i "${toFfmpegPath(inputUri)}" -vn -ac 1 -ar 16000 -c:a aac -b:a 32k -f segment -segment_time 3600 "${toFfmpegPath(chunkDir)}chunk_%03d.m4a"`;
+  await runFfmpeg(command, 'Compress and split');
+  
+  // ffmpeg creates chunk_000.m4a, chunk_001.m4a... Read the directory to get them all
+  const files = await FileSystem.readDirectoryAsync(chunkDir);
+  const chunkUris = files
+    .filter((f) => f.startsWith('chunk_') && f.endsWith('.m4a'))
+    .sort() // ensure sequential order (000, 001, 002)
+    .map((f) => chunkDir + f);
+    
+  if (chunkUris.length === 0) {
+    throw new Error('FFmpeg failed to generate any transcription chunks.');
+  }
+  
+  return { chunkUris, chunkDir };
+}
