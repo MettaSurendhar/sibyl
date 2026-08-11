@@ -7,6 +7,9 @@ import {
 	Modal,
 	ActivityIndicator,
 	BackHandler,
+	TextInput,
+	Keyboard,
+	Animated,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -36,6 +39,23 @@ function formatCentis(ms) {
 	return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cc).padStart(2, '0')}`;
 }
 
+function parseTimeString(str, fallbackMs) {
+	if (!str) return fallbackMs;
+	str = str.replace(/[^0-9:.]/g, '');
+	if (!str) return fallbackMs;
+	let m = 0;
+	let s = 0;
+	const parts = str.split(':');
+	if (parts.length > 1) {
+		m = parseInt(parts[0], 10) || 0;
+		s = parseFloat(parts[1]) || 0;
+	} else {
+		s = parseFloat(parts[0]) || 0;
+	}
+	const ms = Math.floor((m * 60 + s) * 1000);
+	return isNaN(ms) ? fallbackMs : ms;
+}
+
 export default function TrimScreen({ route, navigation }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
@@ -45,6 +65,8 @@ export default function TrimScreen({ route, navigation }) {
 	const [categories, setCategories] = useState([]);
 	const [startMs, setStartMs] = useState(0);
 	const [endMs, setEndMs] = useState(0);
+	const [startInput, setStartInput] = useState('');
+	const [endInput, setEndInput] = useState('');
 	const [activeHandle, setActiveHandle] = useState('start'); // 'start' | 'end' - which the zoomed view follows
 	const [containerWidth, setContainerWidth] = useState(0);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -57,6 +79,36 @@ export default function TrimScreen({ route, navigation }) {
 	const startMsRef = useRef(0);
 	const endMsRef = useRef(0);
 	const dragStartMsRef = useRef({ start: 0, end: 0 });
+	const previewMsRef = useRef(0);
+
+	const startXAnim = useRef(new Animated.Value(0)).current;
+	const endXAnim = useRef(new Animated.Value(0)).current;
+	const previewXAnim = useRef(new Animated.Value(0)).current;
+	const isScrubbing = useRef(false);
+	const initialScrubX = useRef(0);
+
+	// Update anims when state changes from external sources (reset, inputs)
+	useEffect(() => {
+		if (containerWidth > 0 && entry?.totalDurationMs) {
+			startXAnim.setValue((startMs / entry.totalDurationMs) * containerWidth);
+		}
+	}, [startMs, containerWidth, entry]);
+
+	useEffect(() => {
+		if (containerWidth > 0 && entry?.totalDurationMs) {
+			endXAnim.setValue((endMs / entry.totalDurationMs) * containerWidth);
+		}
+	}, [endMs, containerWidth, entry]);
+
+	useEffect(() => {
+		previewMsRef.current = previewMs;
+		if (containerWidth > 0 && entry?.totalDurationMs && !isScrubbing.current) {
+			const clampedMs = Math.max(startMs, Math.min(previewMs, endMs));
+			previewXAnim.setValue(
+				(clampedMs / entry.totalDurationMs) * containerWidth,
+			);
+		}
+	}, [previewMs, startMs, endMs, containerWidth, entry]);
 
 	// IMPORTANT: the handle PanResponders below are created exactly once via useRef. Their
 	// closures can only see whatever `entry`/`containerWidth` were at that first creation - if
@@ -112,6 +164,13 @@ export default function TrimScreen({ route, navigation }) {
 		}, [entryId]),
 	);
 
+	useEffect(() => {
+		setStartInput(formatCentis(startMs));
+	}, [startMs]);
+	useEffect(() => {
+		setEndInput(formatCentis(endMs));
+	}, [endMs]);
+
 	const hasChanges = entry && (startMs > 0 || endMs < entry.totalDurationMs);
 
 	useFocusEffect(
@@ -150,15 +209,19 @@ export default function TrimScreen({ route, navigation }) {
 						Math.min(proposedMs, endMsRef.current - MIN_SELECTION_MS),
 					);
 					startMsRef.current = clamped;
-					setStartMs(clamped);
+					startXAnim.setValue((clamped / currentEntry.totalDurationMs) * width);
 				} else {
 					const clamped = Math.max(
 						startMsRef.current + MIN_SELECTION_MS,
 						Math.min(proposedMs, currentEntry.totalDurationMs),
 					);
 					endMsRef.current = clamped;
-					setEndMs(clamped);
+					endXAnim.setValue((clamped / currentEntry.totalDurationMs) * width);
 				}
+			},
+			onPanResponderRelease: () => {
+				if (which === 'start') setStartMs(startMsRef.current);
+				else setEndMs(endMsRef.current);
 			},
 		});
 	}
@@ -166,8 +229,51 @@ export default function TrimScreen({ route, navigation }) {
 	const startHandlePan = useRef(makeHandlePanResponder('start')).current;
 	const endHandlePan = useRef(makeHandlePanResponder('end')).current;
 
-	// Dragging directly on the zoomed detail view nudges whichever handle it's currently following.
-	function handleZoomedSeek(ms) {
+	const scrubHandlePan = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponder: () => true,
+			onMoveShouldSetPanResponder: () => true,
+			onPanResponderGrant: () => {
+				isScrubbing.current = true;
+				const width = containerWidthRef.current;
+				const currentEntry = entryRef.current;
+				if (!width || !currentEntry) return;
+				initialScrubX.current =
+					(previewMsRef.current / currentEntry.totalDurationMs) * width;
+			},
+			onPanResponderMove: (evt, gesture) => {
+				const width = containerWidthRef.current;
+				const currentEntry = entryRef.current;
+				if (!width || !currentEntry) return;
+				const startX =
+					(startMsRef.current / currentEntry.totalDurationMs) * width;
+				const endX = (endMsRef.current / currentEntry.totalDurationMs) * width;
+				const newX = Math.max(
+					startX,
+					Math.min(initialScrubX.current + gesture.dx, endX),
+				);
+				previewXAnim.setValue(newX);
+			},
+			onPanResponderRelease: (evt, gesture) => {
+				isScrubbing.current = false;
+				const width = containerWidthRef.current;
+				const currentEntry = entryRef.current;
+				if (!width || !currentEntry) return;
+				const startX =
+					(startMsRef.current / currentEntry.totalDurationMs) * width;
+				const endX = (endMsRef.current / currentEntry.totalDurationMs) * width;
+				const newX = Math.max(
+					startX,
+					Math.min(initialScrubX.current + gesture.dx, endX),
+				);
+				const ms = (newX / width) * currentEntry.totalDurationMs;
+				seekPreviewTo(ms);
+			},
+		}),
+	).current;
+
+	// Only used by inputs now since we removed the zoomed map
+	function handleManualSeek(ms) {
 		if (!entry) return;
 		if (activeHandle === 'start') {
 			const clamped = Math.max(
@@ -186,15 +292,49 @@ export default function TrimScreen({ route, navigation }) {
 		}
 	}
 
+	function handleStartInputSubmit() {
+		if (!entry) return;
+		let ms = parseTimeString(startInput, startMs);
+		ms = Math.max(0, Math.min(ms, endMsRef.current - MIN_SELECTION_MS));
+		startMsRef.current = ms;
+		setStartMs(ms);
+		setStartInput(formatCentis(ms));
+		setActiveHandle('start');
+	}
+
+	function handleEndInputSubmit() {
+		if (!entry) return;
+		let ms = parseTimeString(endInput, endMs);
+		ms = Math.max(
+			startMsRef.current + MIN_SELECTION_MS,
+			Math.min(ms, entry.totalDurationMs),
+		);
+		endMsRef.current = ms;
+		setEndMs(ms);
+		setEndInput(formatCentis(ms));
+		setActiveHandle('end');
+	}
+
 	async function togglePreview() {
 		if (isPlaying) {
 			await playerRef.current?.pause();
 			setIsPlaying(false);
 			return;
 		}
-		await playerRef.current?.seek(startMs);
+		// If playhead is outside the trimmed bounds or has reached the end, loop back to start.
+		// Otherwise, resume exactly from where the white thumb was dragged.
+		if (previewMs < startMs || previewMs >= endMs) {
+			await playerRef.current?.seek(startMs);
+		} else {
+			await playerRef.current?.seek(previewMs);
+		}
 		await playerRef.current?.play();
 		setIsPlaying(true);
+	}
+
+	async function seekPreviewTo(ms) {
+		await playerRef.current?.seek(ms);
+		setPreviewMs(ms);
 	}
 
 	function handleReset() {
@@ -314,14 +454,54 @@ export default function TrimScreen({ route, navigation }) {
 					mutedColor={activeHandle === 'start' ? accent : theme.waveformMuted}
 					height={150}
 					barWidth={3}
-					onSeek={handleZoomedSeek}
+					onSeek={handleManualSeek}
 				/>
 			</View>
 
 			<View style={styles.centerInfo}>
-				<Text style={[styles.bigTime, { color: theme.text }]}>
-					{formatCentis(zoomedPositionMs)}
-				</Text>
+				<View style={styles.timeInputsRow}>
+					<View style={styles.timeInputBox}>
+						<Text style={[styles.timeLabel, { color: theme.textMuted }]}>
+							From
+						</Text>
+						<TextInput
+							style={[
+								styles.bigTimeInput,
+								{
+									color:
+										activeHandle === 'start' ? theme.text : theme.textMuted,
+								},
+							]}
+							value={startInput}
+							onChangeText={setStartInput}
+							onBlur={handleStartInputSubmit}
+							onSubmitEditing={handleStartInputSubmit}
+							keyboardType='numeric'
+							returnKeyType='done'
+							onFocus={() => setActiveHandle('start')}
+						/>
+					</View>
+					<View style={styles.timeInputBox}>
+						<Text style={[styles.timeLabel, { color: theme.textMuted }]}>
+							To
+						</Text>
+						<TextInput
+							style={[
+								styles.bigTimeInput,
+								{
+									color: activeHandle === 'end' ? theme.text : theme.textMuted,
+								},
+							]}
+							value={endInput}
+							onChangeText={setEndInput}
+							onBlur={handleEndInputSubmit}
+							onSubmitEditing={handleEndInputSubmit}
+							keyboardType='numeric'
+							returnKeyType='done'
+							onFocus={() => setActiveHandle('end')}
+						/>
+					</View>
+				</View>
 				<Text
 					style={[styles.entryName, { color: theme.textMuted }]}
 					numberOfLines={1}
@@ -335,70 +515,89 @@ export default function TrimScreen({ route, navigation }) {
 					style={styles.waveformBox}
 					onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
 				>
-					<StaticWaveform
-						waveform={entry.waveform}
-						totalDurationMs={entry.totalDurationMs}
-						progress={
-							entry.totalDurationMs ? previewMs / entry.totalDurationMs : 0
-						}
-						color={accent}
-						mutedColor={theme.waveformMuted}
-						height={60}
-						barWidth={2}
+					{/* Sleek track line */}
+					<View
+						style={[styles.trackLine, { backgroundColor: theme.surfaceAlt }]}
 					/>
+					{/* Played progress highlight */}
+					{containerWidth > 0 && entry.totalDurationMs > 0 && (
+						<Animated.View
+							style={[
+								styles.trackProgress,
+								{
+									backgroundColor: accent,
+									width: previewXAnim,
+								},
+							]}
+						/>
+					)}
 					{containerWidth > 0 && (
 						<>
-							<View
-								style={[
-									styles.dimOverlay,
-									{ left: 0, width: startRatio * containerWidth },
-								]}
-							/>
-							<View
+							<Animated.View
 								style={[
 									styles.dimOverlay,
 									{
-										left: endRatio * containerWidth,
-										width: containerWidth - endRatio * containerWidth,
+										left: 0,
+										width: startXAnim,
+										backgroundColor: theme.bg,
+										opacity: 0.6,
 									},
 								]}
 							/>
-							<View
+							<Animated.View
+								style={[
+									styles.dimOverlay,
+									{
+										left: endXAnim,
+										right: 0,
+										backgroundColor: theme.bg,
+										opacity: 0.6,
+									},
+								]}
+							/>
+							<Animated.View
 								{...startHandlePan.panHandlers}
 								style={[
 									styles.handle,
-									{
-										left: startRatio * containerWidth - 12,
-										backgroundColor: accent,
-									},
+									{ left: startXAnim, transform: [{ translateX: -16 }] },
 								]}
 							>
-								<View style={styles.handleGrip} />
-							</View>
-							<View
+								<View
+									style={[styles.handleStick, { backgroundColor: accent }]}
+								/>
+							</Animated.View>
+							<Animated.View
 								{...endHandlePan.panHandlers}
 								style={[
 									styles.handle,
-									{
-										left: endRatio * containerWidth - 12,
-										backgroundColor: accent,
-									},
+									{ left: endXAnim, transform: [{ translateX: -16 }] },
 								]}
 							>
-								<View style={styles.handleGrip} />
-							</View>
+								<View
+									style={[styles.handleStick, { backgroundColor: accent }]}
+								/>
+							</Animated.View>
+
+							{/* Scrub Thumb */}
+							<Animated.View
+								{...scrubHandlePan.panHandlers}
+								style={[
+									styles.thumbHit,
+									{ transform: [{ translateX: previewXAnim }] },
+								]}
+							>
+								<View style={styles.thumb} />
+							</Animated.View>
 						</>
 					)}
 				</View>
 				<View style={styles.labelsRow}>
 					<Text style={[styles.labelSmall, { color: theme.textMuted }]}>
-						{formatDuration(startMs)}
+						{formatDuration(previewMs)} /{' '}
+						{formatDuration(entry.totalDurationMs)}
 					</Text>
 					<Text style={[styles.labelSmall, { color: theme.accent }]}>
 						{formatDuration(endMs - startMs)} selected
-					</Text>
-					<Text style={[styles.labelSmall, { color: theme.textMuted }]}>
-						{formatDuration(endMs)}
 					</Text>
 				</View>
 			</View>
@@ -424,7 +623,7 @@ export default function TrimScreen({ route, navigation }) {
 					<Feather
 						name={isPlaying ? 'pause' : 'play'}
 						size={26}
-						color='#fff'
+						color={theme.accentDeep}
 						style={isPlaying ? undefined : { marginLeft: 3 }}
 					/>
 				</TouchableOpacity>
@@ -508,32 +707,54 @@ const styles = StyleSheet.create({
 	},
 	topBarAction: { fontSize: 15, fontWeight: '600' },
 	title: { fontSize: 16, fontWeight: '700' },
-	zoomedSection: { marginTop: 20 },
-	centerInfo: { alignItems: 'center', marginTop: 8 },
-	bigTime: { fontSize: 36, fontWeight: '200', fontVariant: ['tabular-nums'] },
-	entryName: { fontSize: 13, marginTop: 2 },
+	zoomedSection: { marginTop: 20, marginBottom: 20 },
+	centerInfo: { alignItems: 'center', marginTop: 12 },
+	timeInputsRow: { flexDirection: 'row', gap: 24, justifyContent: 'center' },
+	timeInputBox: { alignItems: 'center' },
+	timeLabel: {
+		fontSize: 11,
+		fontWeight: '700',
+		textTransform: 'uppercase',
+		marginBottom: 4,
+	},
+	bigTimeInput: {
+		fontSize: 32,
+		fontWeight: '200',
+		fontVariant: ['tabular-nums'],
+		textAlign: 'center',
+		minWidth: 120,
+		padding: 0,
+	},
+	entryName: { fontSize: 13, marginTop: 12 },
 	minimapSection: { marginTop: 'auto', paddingHorizontal: 36 },
-	waveformBox: { position: 'relative' },
+	waveformBox: { position: 'relative', height: 60, justifyContent: 'center' },
+	trackLine: {
+		height: 4,
+		borderRadius: 2,
+		position: 'absolute',
+		left: 0,
+		right: 0,
+	},
+	trackProgress: { height: 4, borderRadius: 2, position: 'absolute', left: 0 },
 	dimOverlay: {
 		position: 'absolute',
 		top: 0,
 		bottom: 0,
-		backgroundColor: 'rgba(0,0,0,0.55)',
 	},
 	handle: {
 		position: 'absolute',
 		top: 0,
 		bottom: 0,
-		width: 24,
+		width: 32,
 		borderRadius: 0,
 		alignItems: 'center',
 		justifyContent: 'center',
+		backgroundColor: 'transparent',
 	},
-	handleGrip: {
-		width: 3,
-		height: 20,
+	handleStick: {
+		width: 4,
+		height: 44,
 		borderRadius: 2,
-		backgroundColor: 'rgba(255,255,255,0.8)',
 	},
 	labelsRow: {
 		flexDirection: 'row',
@@ -541,6 +762,28 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	labelSmall: { fontSize: 12, fontWeight: '600' },
+	thumbHit: {
+		position: 'absolute',
+		left: -24, // HIT_SLOP / 2
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+		top: 6, // center vertically in the 60px box
+		backgroundColor: 'transparent',
+	},
+	thumb: {
+		width: 18,
+		height: 18,
+		borderRadius: 9,
+		backgroundColor: '#FFFFFF',
+		elevation: 4,
+		shadowColor: '#000',
+		shadowOpacity: 0.3,
+		shadowRadius: 3,
+		shadowOffset: { width: 0, height: 1 },
+	},
 	bottomRow: {
 		flexDirection: 'row',
 		alignItems: 'center',

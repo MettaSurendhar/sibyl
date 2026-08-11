@@ -237,7 +237,7 @@ export default function MergeScreen({ route, navigation }) {
 				>
 					<Text
 						style={{
-							color: selectedIds.length ? '#fff' : theme.textMuted,
+							color: selectedIds.length ? theme.accentDeep : theme.textMuted,
 							fontWeight: '700',
 						}}
 					>
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	orderBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+	orderBadgeText: { color: '#A07C30', fontSize: 11, fontWeight: '700' },
 	bottomRow: { paddingHorizontal: 20 },
 	mergeBtn: { paddingVertical: 15, borderRadius: 12, alignItems: 'center' },
 	processingOverlay: {

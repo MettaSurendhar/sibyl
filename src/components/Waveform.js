@@ -76,6 +76,8 @@ export function ScrollingPlaybackTrack({
   const draggingRef = useRef(false);
   const dragStartIndexRef = useRef(0);
   const dragLatestIndexRef = useRef(0);
+  const positionMsRef = useRef(positionMs);
+  const totalDurationMsRef = useRef(totalDurationMs);
   const slotWidth = barWidth + gap;
   const waveHeight = height - 30; // reserve top ~30px for the ruler row
 
@@ -85,6 +87,11 @@ export function ScrollingPlaybackTrack({
 
   const indexForMs = (ms) => ms / SAMPLE_INTERVAL_MS;
   const targetForIndex = (idx) => (containerWidth / 2) - (idx * slotWidth) - (slotWidth / 2);
+
+  useEffect(() => {
+    positionMsRef.current = positionMs;
+    totalDurationMsRef.current = totalDurationMs;
+  }, [positionMs, totalDurationMs]);
 
   useEffect(() => {
     if (draggingRef.current || !containerWidth) return;
@@ -102,11 +109,11 @@ export function ScrollingPlaybackTrack({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         draggingRef.current = true;
-        dragStartIndexRef.current = indexForMs(positionMs);
+        dragStartIndexRef.current = indexForMs(positionMsRef.current);
         dragLatestIndexRef.current = dragStartIndexRef.current;
       },
       onPanResponderMove: (evt, gesture) => {
-        const maxIndex = totalDurationMs / SAMPLE_INTERVAL_MS;
+        const maxIndex = totalDurationMsRef.current / SAMPLE_INTERVAL_MS;
         const newIndex = Math.max(0, Math.min(maxIndex, dragStartIndexRef.current - gesture.dx / slotWidth));
         dragLatestIndexRef.current = newIndex;
         translateX.setValue(targetForIndex(newIndex));
