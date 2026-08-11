@@ -24,7 +24,11 @@
         "RECORD_AUDIO",
         "WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -55,7 +59,8 @@
           "backgroundColor": "#0E1926"
         }
       ],
-      "./plugins/withFfmpegKitFix.js"
+      "./plugins/withFfmpegKitFix.js",
+      "./plugins/withNotifee.js"
     ],
     "extra": {
       "eas": {

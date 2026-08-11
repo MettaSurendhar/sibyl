@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
 	View,
 	TouchableOpacity,
@@ -35,6 +35,8 @@ import { isExternalFolderSupported } from '../utils/externalFolder';
 import { transcribeFile } from '../groq/transcribe';
 import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
+import { NotificationService } from '../services/NotificationService';
+import { MediaController } from '../services/MediaController';
 
 function formatCentis(ms) {
 	const totalCentis = Math.floor(ms / 10);
@@ -58,6 +60,8 @@ export default function RecordScreen({ navigation }) {
 	const [folderHintVisible, setFolderHintVisible] = useState(false);
 	const recorderRef = useRef(null);
 	const pendingResultRef = useRef(null);
+	const samplesRef = useRef([]); // track fresh samples for background save
+	const statusRef = useRef('idle'); // track fresh status for background controls
 	
 	const mountAnim = useRef(new Animated.Value(0)).current;
 	const recordBtnScale = useRef(new Animated.Value(1)).current;
@@ -71,6 +75,9 @@ export default function RecordScreen({ navigation }) {
 		}).start();
 	}, []);
 
+	useEffect(() => { statusRef.current = status; }, [status]);
+	useEffect(() => { samplesRef.current = samples; }, [samples]);
+
 	const refreshCategories = useCallback(
 		() => listCategories().then(setCategories),
 		[],
@@ -81,6 +88,25 @@ export default function RecordScreen({ navigation }) {
 			refreshCategories();
 			totalEntryCount().then((n) => setSessionNumber(n + 1));
 		}, [refreshCategories]),
+	);
+
+	// Register MediaController so notification buttons work in background
+	useFocusEffect(
+		useCallback(() => {
+			MediaController.register({
+				onPlay: () => { if (statusRef.current === 'paused') handleResume(); },
+				onPause: () => { if (statusRef.current === 'recording') handlePause(); },
+				onSave: () => {
+					if (statusRef.current === 'recording' || statusRef.current === 'paused') {
+						saveBackground();
+					}
+				}
+			});
+			return () => {
+				MediaController.unregister();
+				NotificationService.stopNotification();
+			};
+		}, []) // uses refs for status/samples so empty deps is safe
 	);
 
 	// Confirm-to-discard when leaving mid-recording (back button / gesture)
@@ -139,13 +165,18 @@ export default function RecordScreen({ navigation }) {
 			onMeter: (db, ms) => {
 				setSamples((prev) => {
 					const expectedCount = Math.round(ms / 100);
+					let nextSamples;
 					if (expectedCount > prev.length + 1) {
 						const gapFill = Array(expectedCount - prev.length - 1).fill(db);
-						return [...prev, ...gapFill, db];
+						nextSamples = [...prev, ...gapFill, db];
+					} else {
+						nextSamples = [...prev, db];
 					}
-					return [...prev, db];
+					samplesRef.current = nextSamples;
+					return nextSamples;
 				});
 				setElapsedMs(ms);
+				NotificationService.startRecordingNotification(true, ms);
 			},
 		});
 		try {
@@ -162,20 +193,33 @@ export default function RecordScreen({ navigation }) {
 	async function handlePause() {
 		await recorderRef.current?.pause();
 		setStatus('paused');
+		NotificationService.startRecordingNotification(false, elapsedMs);
 	}
 
 	async function handleResume() {
 		await recorderRef.current?.resume();
 		setStatus('recording');
+		NotificationService.startRecordingNotification(true, elapsedMs);
 	}
 
 	async function handleStop() {
 		const result = await recorderRef.current?.stop();
 		setStatus('idle');
+		NotificationService.stopNotification();
 		if (!result) return;
-		pendingResultRef.current = { ...result, waveform: samples };
+		pendingResultRef.current = { ...result, waveform: samplesRef.current };
 		Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 		setSheetVisible(true);
+	}
+
+	async function saveBackground() {
+		const result = await recorderRef.current?.stop();
+		setStatus('idle');
+		NotificationService.stopNotification();
+		if (!result) return;
+		pendingResultRef.current = { ...result, waveform: samplesRef.current };
+		// Automatically finalize as untagged
+		await finalizeSave(null, '');
 	}
 
 	async function finalizeSave(categoryId, name) {

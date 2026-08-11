@@ -23,6 +23,11 @@ export function computeSilenceRanges(waveform) {
 
 // Plays a list of segments [{uri, durationMs}] as one continuous timeline.
 export function createPlayer({ segments, onStatus }) {
+  Audio.setAudioModeAsync({
+    allowsRecordingIOS: false,
+    playsInSilentModeIOS: true,
+    staysActiveInBackground: true,
+  });
   let sound = null;
   let currentIndex = 0;
   let rate = 1.0;

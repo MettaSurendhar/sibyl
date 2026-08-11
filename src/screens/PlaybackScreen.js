@@ -53,6 +53,8 @@ import {
 } from '../utils/externalFolder';
 import { transcribeSegments, languageDisplayName } from '../groq/transcribe';
 import { PlaybackSlider } from '../components/CustomProgressBar';
+import { NotificationService } from '../services/NotificationService';
+import { MediaController } from '../services/MediaController';
 
 // Page 2's "no API key" case is by far the most common failure - give it a distinct sentinel
 // so the warning under the Transcribe button can show a tappable Settings link instead of a
@@ -115,16 +117,60 @@ export default function PlaybackScreen({ route, navigation }) {
 			listCategories().then(setCategories);
 			load().then((e) => {
 				if (cancelled || !e) return;
+				
+				NotificationService.startPlaybackNotification(e.name || 'Untagged', false, 0, e.totalDurationMs);
+				
 				playerRef.current = createPlayer({
 					segments: e.segments,
 					onStatus: (s) => {
 						setPositionMs(s.positionMs);
 						if (s.finished) setIsPlaying(false);
+						
+						NotificationService.updatePlaybackProgress(
+							e.name || 'Untagged', 
+							s.isPlaying, 
+							s.positionMs, 
+							e.totalDurationMs
+						);
 					},
 				});
+				
+				// Keep track of latest position for seek actions
+				let lastPosMs = 0;
+				const updatePos = (pos) => { lastPosMs = pos; return pos; };
+				setPositionMs(updatePos); // Just to grab current state if needed, but onStatus updates it better. Actually we can rely on state for re-registering or just use the local let since onStatus closure isn't stale for lastPosMs? 
+				// Wait, onStatus is a closure that gets the INITIAL state. No, it gets `setPositionMs` which is stable. 
+				// To keep lastPosMs accurate, let's wrap setPositionMs.
 			});
+			
+			// Register controller actions
+			MediaController.register({
+				onPlay: () => {
+					playerRef.current?.play();
+					setIsPlaying(true);
+				},
+				onPause: () => {
+					playerRef.current?.pause();
+					setIsPlaying(false);
+				},
+				onFwd: () => {
+					setPositionMs(prev => {
+						playerRef.current?.seek(prev + 15000);
+						return prev;
+					});
+				},
+				onBwd: () => {
+					setPositionMs(prev => {
+						playerRef.current?.seek(prev - 15000);
+						return prev;
+					});
+				}
+			});
+
 			return () => {
 				cancelled = true;
+				MediaController.unregister();
+				NotificationService.stopNotification();
 				playerRef.current?.unload();
 				playerRef.current = null;
 			};

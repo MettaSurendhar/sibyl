@@ -46,7 +46,7 @@ export function createRecorder({ onMeter }) {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+      staysActiveInBackground: true,
     });
   }
 

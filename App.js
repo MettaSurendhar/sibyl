@@ -16,6 +16,7 @@ import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { AlertProvider } from './src/theme/AlertContext';
 import { getDb } from './src/db/database';
 import HomeLibraryPager from './src/navigation/HomeLibraryPager';
+import './src/services/NotificationService'; // Register Notifee background event early
 import RecordScreen from './src/screens/RecordScreen';
 import PlaybackScreen from './src/screens/PlaybackScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
