@@ -56,7 +56,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 	UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function LibraryScreen({ navigation, isEditMode, onEditModeChange, initialFilter, onFilterConsumed }) {
+export default function LibraryScreen({ navigation, isEditMode, onEditModeChange, initialFilter, onFilterConsumed, onScrollLockChange }) {
 	const { theme } = useTheme();
 	const alert = useAlert();
 	const insets = useSafeAreaInsets();
@@ -594,6 +594,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 						onSeek={seekEntry}
 						showAbsoluteDate={editMode}
 						onLongPress={handleLongPress}
+						onSliderActiveChange={onScrollLockChange}
 					/>
 				)}
 				ListEmptyComponent={
