@@ -6,6 +6,7 @@ import {
 	Dimensions,
 	StyleSheet,
 	BackHandler,
+	Animated,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -40,6 +41,16 @@ export default function HomeLibraryPager({ navigation, route }) {
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [libraryEditMode, setLibraryEditMode] = useState(false);
 	const [libraryInitialFilter, setLibraryInitialFilter] = useState(null);
+
+	const slideAnim = useRef(new Animated.Value(0)).current;
+
+	React.useEffect(() => {
+		Animated.timing(slideAnim, {
+			toValue: libraryEditMode ? 1 : 0,
+			duration: 250,
+			useNativeDriver: false,
+		}).start();
+	}, [libraryEditMode, slideAnim]);
 
 	const goToPage = useCallback((index) => {
 		scrollRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
@@ -110,45 +121,47 @@ export default function HomeLibraryPager({ navigation, route }) {
 				</View>
 			</ScrollView>
 
-			{!libraryEditMode && (
-				<View
-					style={[
-						styles.tabBar,
-						{
-							height: tabBarHeight,
-							paddingBottom: insets.bottom,
-							backgroundColor: theme.surface,
-							borderTopColor: theme.border,
-						},
-					]}
-				>
-					{TABS.map((tab, index) => {
-						const active = activeIndex === index;
-						const color = active ? theme.accent : theme.textMuted;
-						return (
-							<TouchableOpacity
-								key={tab.key}
-								style={styles.tabItem}
-								onPress={() => goToPage(index)}
-							>
-								<Feather
-									name={tab.icon}
-									size={22}
-									color={color}
-								/>
-								<Text style={[styles.tabLabel, { color }]}>{tab.label}</Text>
-							</TouchableOpacity>
-						);
-					})}
-				</View>
-			)}
+			<Animated.View
+				style={[
+					styles.tabBar,
+					{
+						height: tabBarHeight,
+						paddingBottom: insets.bottom,
+						backgroundColor: theme.surface,
+						borderTopColor: theme.border,
+						marginBottom: slideAnim.interpolate({
+							inputRange: [0, 1],
+							outputRange: [0, -tabBarHeight]
+						})
+					},
+				]}
+				pointerEvents={libraryEditMode ? 'none' : 'auto'}
+			>
+				{TABS.map((tab, index) => {
+					const active = activeIndex === index;
+					const color = active ? theme.accent : theme.textMuted;
+					return (
+						<TouchableOpacity
+							key={tab.key}
+							style={styles.tabItem}
+							onPress={() => goToPage(index)}
+						>
+							<Feather
+								name={tab.icon}
+								size={22}
+								color={color}
+							/>
+							<Text style={[styles.tabLabel, { color }]}>{tab.label}</Text>
+						</TouchableOpacity>
+					);
+				})}
+			</Animated.View>
 
-			{!libraryEditMode && (
-				<FloatingRecordButton
-					onPress={() => navigation.navigate('Record')}
-					bottomOffset={tabBarHeight + 16}
-				/>
-			)}
+			<FloatingRecordButton
+				onPress={() => navigation.navigate('Record')}
+				bottomOffset={tabBarHeight + 16}
+				visible={!libraryEditMode}
+			/>
 		</View>
 	);
 }

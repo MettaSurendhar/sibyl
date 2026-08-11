@@ -28,7 +28,7 @@ const MARGIN = 16;
 // releasing snaps it fully on-screen and remembers the new spot for next launch. Tap and
 // long-press-drag are composed as a Race so a normal tap can never accidentally trigger a
 // drag, and a drag can never accidentally fire onPress.
-export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
+export default function FloatingRecordButton({ onPress, bottomOffset = 24, visible = true }) {
 	const { theme } = useTheme();
 	const insets = useSafeAreaInsets();
 	const { width: screenW, height: screenH } = Dimensions.get('window');
@@ -44,6 +44,14 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 	const scale = useSharedValue(1);
 	const pulseScale = useSharedValue(1);
 	const pulseOpacity = useSharedValue(0.6);
+	const visibilityScale = useSharedValue(visible ? 1 : 0);
+
+	useEffect(() => {
+		visibilityScale.value = withSpring(visible ? 1 : 0, {
+			damping: 15,
+			stiffness: 200,
+		});
+	}, [visible]);
 
 	// Restore any remembered position once on mount.
 	useEffect(() => {
@@ -139,7 +147,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24 }) {
 		transform: [
 			{ translateX: translateX.value },
 			{ translateY: translateY.value },
-			{ scale: scale.value },
+			{ scale: scale.value * visibilityScale.value },
 		],
 	}));
 
