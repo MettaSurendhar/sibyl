@@ -5,8 +5,6 @@ import Animated, {
 	useSharedValue,
 	useAnimatedStyle,
 	withSpring,
-	withRepeat,
-	withSequence,
 	withTiming,
 	runOnJS,
 } from 'react-native-reanimated';
@@ -42,8 +40,6 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 	const startY = useSharedValue(defaultY);
 	const isDragging = useSharedValue(false);
 	const scale = useSharedValue(1);
-	const pulseScale = useSharedValue(1);
-	const pulseOpacity = useSharedValue(0.6);
 	const visibilityScale = useSharedValue(visible ? 1 : 0);
 
 	useEffect(() => {
@@ -61,23 +57,6 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 				translateY.value = prefs.fabPosition.y;
 			}
 		});
-		// Start idle pulse animation
-		pulseScale.value = withRepeat(
-			withSequence(
-				withTiming(1.5, { duration: 1200 }),
-				withTiming(1, { duration: 0 }),
-			),
-			-1,
-			false,
-		);
-		pulseOpacity.value = withRepeat(
-			withSequence(
-				withTiming(0, { duration: 1200 }),
-				withTiming(0.5, { duration: 0 }),
-			),
-			-1,
-			false,
-		);
 	}, []);
 
 	function persistPosition(x, y) {
@@ -107,7 +86,7 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 			isDragging.value = true;
 			startX.value = translateX.value;
 			startY.value = translateY.value;
-			scale.value = withSpring(1.15, { damping: 10, stiffness: 200 });
+			scale.value = withSpring(0.85, { damping: 10, stiffness: 200 });
 			runOnJS(hapticStart)();
 		})
 		.onEnd(() => {
@@ -151,17 +130,9 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 		],
 	}));
 
-	const pulseStyle = useAnimatedStyle(() => ({
-		transform: [{ scale: pulseScale.value }],
-		opacity: pulseOpacity.value,
-	}));
-
 	return (
 		<GestureDetector gesture={composed}>
 			<Animated.View style={[styles.container, animatedStyle]}>
-				{/* Idle pulse ring */}
-				<Animated.View style={[styles.pulse, { borderColor: theme.accent }, pulseStyle]} />
-
 				{/* Halo ring to lift it off the dark background */}
 				<View style={[styles.halo, { borderColor: theme.accent }]} />
 
@@ -195,15 +166,6 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0,0,0,0.3)',
 		borderWidth: 1,
 		opacity: 0.3,
-	},
-	pulse: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		width: BUTTON_SIZE,
-		height: BUTTON_SIZE,
-		borderRadius: BUTTON_SIZE / 2,
-		borderWidth: 2,
 	},
 	fab: {
 		width: BUTTON_SIZE,
