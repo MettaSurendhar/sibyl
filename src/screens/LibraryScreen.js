@@ -9,8 +9,9 @@ import {
 	BackHandler,
 	LayoutAnimation,
 	Platform,
-	UIManager,
 	DeviceEventEmitter,
+	Animated,
+	UIManager,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -70,6 +71,16 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 	
 	const editMode = isEditMode || false;
 	const setEditMode = onEditModeChange || (() => {});
+	const editAnim = useRef(new Animated.Value(editMode ? 1 : 0)).current;
+
+	useEffect(() => {
+		Animated.spring(editAnim, {
+			toValue: editMode ? 1 : 0,
+			useNativeDriver: true,
+			friction: 8,
+			tension: 60,
+		}).start();
+	}, [editMode, editAnim]);
 	const [selectedIds, setSelectedIds] = useState([]);
 	const [activeEntryId, setActiveEntryId] = useState(null);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -355,22 +366,22 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 
 	return (
 		<View style={[styles.container, { backgroundColor: theme.bg }]}>
-			<View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-				{editMode ? (
-					<TouchableOpacity
-						onPress={() => {
-							setEditMode(false);
-							setSelectedIds([]);
-						}}
-						style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
-					>
-						<Feather
-							name='x'
-							size={20}
-							color={theme.textMuted}
-						/>
-					</TouchableOpacity>
-				) : (
+			<View style={{ height: insets.top + 56 }}>
+				{/* Normal Header */}
+				<Animated.View 
+					style={[
+						styles.header, 
+						StyleSheet.absoluteFill,
+						{ 
+							paddingTop: insets.top + 10, 
+							opacity: editAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+							transform: [{ 
+								translateY: editAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) 
+							}]
+						}
+					]} 
+					pointerEvents={editMode ? 'none' : 'auto'}
+				>
 					<View>
 						<Text style={[styles.headerTitle, { color: theme.accent, textTransform: 'uppercase' }]}>
 							Library
@@ -379,78 +390,76 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 							{entries.length} recording{entries.length === 1 ? '' : 's'}
 						</Text>
 					</View>
-				)}
 
-				<View style={styles.headerActions}>
-					{editMode ? (
+					<View style={styles.headerActions}>
 						<TouchableOpacity
-							onPress={selectAll}
-							style={styles.selectAllRow}
+							onPress={() => {
+								setSearchOpen((v) => !v);
+								setSearch('');
+								setSearchMode(null);
+							}}
+							style={[styles.headerBtn, { backgroundColor: searchOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
 						>
+							<Feather name='search' size={20} color={searchOpen ? theme.accentDeep : theme.textMuted} />
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => setFilterOpen(true)}
+							style={[styles.headerBtn, { backgroundColor: activeFilterCount ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
+						>
+							<Feather name='filter' size={20} color={activeFilterCount ? theme.accentDeep : theme.textMuted} />
+							{activeFilterCount > 0 && (
+								<View style={[styles.filterBadge, { backgroundColor: theme.accentDeep }]}>
+									<Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+								</View>
+							)}
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => setMenuOpen((v) => !v)}
+							style={[styles.headerBtn, { backgroundColor: menuOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
+						>
+							<Feather name='more-vertical' size={20} color={menuOpen ? theme.accentDeep : theme.textMuted} />
+						</TouchableOpacity>
+					</View>
+				</Animated.View>
+
+				{/* Edit Header */}
+				<Animated.View 
+					style={[
+						styles.header, 
+						StyleSheet.absoluteFill,
+						{ 
+							paddingTop: insets.top + 10, 
+							opacity: editAnim,
+							transform: [{ 
+								translateY: editAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) 
+							}]
+						}
+					]} 
+					pointerEvents={editMode ? 'auto' : 'none'}
+				>
+					<TouchableOpacity
+						onPress={() => {
+							setEditMode(false);
+							setSelectedIds([]);
+						}}
+						style={[styles.headerBtn, { backgroundColor: theme.surfaceAlt }]}
+					>
+						<Feather name='x' size={20} color={theme.textMuted} />
+					</TouchableOpacity>
+					
+					<View style={styles.headerActions}>
+						<TouchableOpacity onPress={selectAll} style={styles.selectAllRow}>
 							<Text style={{ color: theme.text, marginRight: 8 }}>
 								{selectedIds.length} selected
 							</Text>
 							<Feather
-								name={
-									selectedIds.length === filtered.length && filtered.length > 0
-										? 'check-square'
-										: 'square'
-								}
+								name={selectedIds.length === filtered.length && filtered.length > 0 ? 'check-square' : 'square'}
 								size={20}
 								color={theme.accent}
 							/>
 						</TouchableOpacity>
-					) : (
-						<>
-							<TouchableOpacity
-								onPress={() => {
-									setSearchOpen((v) => !v);
-									setSearch('');
-									setSearchMode(null);
-								}}
-								style={[styles.headerBtn, { backgroundColor: searchOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
-							>
-								<Feather
-									name='search'
-									size={20}
-									color={searchOpen ? theme.accentDeep : theme.textMuted}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={() => setFilterOpen(true)}
-								style={[styles.headerBtn, { backgroundColor: activeFilterCount ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
-							>
-								<Feather
-									name='filter'
-									size={20}
-									color={activeFilterCount ? theme.accentDeep : theme.textMuted}
-								/>
-								{activeFilterCount > 0 && (
-									<View
-										style={[
-											styles.filterBadge,
-											{ backgroundColor: theme.accentDeep },
-										]}
-									>
-										<Text style={styles.filterBadgeText}>
-											{activeFilterCount}
-										</Text>
-									</View>
-								)}
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={() => setMenuOpen((v) => !v)}
-								style={[styles.headerBtn, { backgroundColor: menuOpen ? `${theme.accentDeep}33` : theme.surfaceAlt }]}
-							>
-								<Feather
-									name='more-vertical'
-									size={20}
-									color={menuOpen ? theme.accentDeep : theme.textMuted}
-								/>
-							</TouchableOpacity>
-						</>
-					)}
-				</View>
+					</View>
+				</Animated.View>
 			</View>
 
 			{menuOpen && !editMode && (
@@ -600,102 +609,112 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 				}
 			/>
 
-			{editMode && (
-				<View
-					style={[
-						styles.actionBar,
-						{
-							backgroundColor: theme.surface,
-							borderColor: theme.border,
-							borderTopWidth: 1,
-							paddingBottom: insets.bottom + 14,
-							opacity: selectedIds.length ? 1 : 0.4,
-						},
-					]}
-					pointerEvents={selectedIds.length ? 'auto' : 'none'}
+			<Animated.View
+				style={[
+					styles.actionBar,
+					{
+						position: 'absolute',
+						bottom: 0,
+						left: 0,
+						right: 0,
+						backgroundColor: theme.surface,
+						borderColor: theme.border,
+						borderTopWidth: 1,
+						paddingBottom: insets.bottom + 14,
+						opacity: selectedIds.length ? 1 : 0.4,
+						transform: [
+							{
+								translateY: editAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: [150, 0], // slide up from bottom
+								}),
+							},
+						],
+					},
+				]}
+				pointerEvents={editMode ? (selectedIds.length ? 'auto' : 'none') : 'none'}
+			>
+				<TouchableOpacity
+					disabled={!selectedIds.length}
+					onPress={handleShare}
+					style={styles.actionBtn}
 				>
-					<TouchableOpacity
-						disabled={!selectedIds.length}
-						onPress={handleShare}
-						style={styles.actionBtn}
+					<Feather
+						name='share-2'
+						size={20}
+						color={selectedIds.length ? theme.text : theme.textMuted}
+					/>
+					<Text
+						style={{
+							color: selectedIds.length ? theme.text : theme.textMuted,
+							fontSize: 12,
+							marginTop: 4,
+						}}
 					>
-						<Feather
-							name='share-2'
-							size={20}
-							color={selectedIds.length ? theme.text : theme.textMuted}
-						/>
-						<Text
-							style={{
-								color: selectedIds.length ? theme.text : theme.textMuted,
-								fontSize: 12,
-								marginTop: 4,
-							}}
-						>
-							Share
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						disabled={selectedIds.length !== 1}
-						onPress={handleRename}
-						style={styles.actionBtn}
+						Share
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					disabled={selectedIds.length !== 1}
+					onPress={handleRename}
+					style={styles.actionBtn}
+				>
+					<Feather
+						name='edit-2'
+						size={20}
+						color={selectedIds.length === 1 ? theme.text : theme.textMuted}
+					/>
+					<Text
+						style={{
+							color: selectedIds.length === 1 ? theme.text : theme.textMuted,
+							fontSize: 12,
+							marginTop: 4,
+						}}
 					>
-						<Feather
-							name='edit-2'
-							size={20}
-							color={selectedIds.length === 1 ? theme.text : theme.textMuted}
-						/>
-						<Text
-							style={{
-								color: selectedIds.length === 1 ? theme.text : theme.textMuted,
-								fontSize: 12,
-								marginTop: 4,
-							}}
-						>
-							Rename
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						disabled={selectedIds.length !== 1}
-						onPress={handleSetRingtone}
-						style={styles.actionBtn}
+						Rename
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					disabled={selectedIds.length !== 1}
+					onPress={handleSetRingtone}
+					style={styles.actionBtn}
+				>
+					<Feather
+						name='bell'
+						size={20}
+						color={selectedIds.length === 1 ? theme.text : theme.textMuted}
+					/>
+					<Text
+						style={{
+							color: selectedIds.length === 1 ? theme.text : theme.textMuted,
+							fontSize: 12,
+							marginTop: 4,
+						}}
 					>
-						<Feather
-							name='bell'
-							size={20}
-							color={selectedIds.length === 1 ? theme.text : theme.textMuted}
-						/>
-						<Text
-							style={{
-								color: selectedIds.length === 1 ? theme.text : theme.textMuted,
-								fontSize: 12,
-								marginTop: 4,
-							}}
-						>
-							Ringtone
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						disabled={!selectedIds.length}
-						onPress={handleDelete}
-						style={styles.actionBtn}
+						Ringtone
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					disabled={!selectedIds.length}
+					onPress={handleDelete}
+					style={styles.actionBtn}
+				>
+					<Feather
+						name='trash-2'
+						size={20}
+						color={selectedIds.length ? '#E5605A' : theme.textMuted}
+					/>
+					<Text
+						style={{
+							color: selectedIds.length ? '#E5605A' : theme.textMuted,
+							fontSize: 12,
+							marginTop: 4,
+						}}
 					>
-						<Feather
-							name='trash-2'
-							size={20}
-							color={selectedIds.length ? '#E5605A' : theme.textMuted}
-						/>
-						<Text
-							style={{
-								color: selectedIds.length ? '#E5605A' : theme.textMuted,
-								fontSize: 12,
-								marginTop: 4,
-							}}
-						>
-							Delete
-						</Text>
-					</TouchableOpacity>
-				</View>
-			)}
+						Delete
+					</Text>
+				</TouchableOpacity>
+			</Animated.View>
 
 			<FilterSheet
 				visible={filterOpen}

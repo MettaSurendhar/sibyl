@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, TouchableOpacity, Pressable, Animated, StyleSheet } from 'react-native';
 import Text from '../theme/Text';
 import Slider from '@react-native-community/slider';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,24 +23,55 @@ export default React.memo(function EntryRow({
 }) {
 	const { theme } = useTheme();
 
+	const scaleAnim = useRef(new Animated.Value(1)).current;
+	const editAnim = useRef(new Animated.Value(editMode ? 1 : 0)).current;
+
+	useEffect(() => {
+		Animated.timing(editAnim, {
+			toValue: editMode ? 1 : 0,
+			duration: 200,
+			useNativeDriver: true,
+		}).start();
+	}, [editMode, editAnim]);
+
+	const handlePressIn = () => {
+		Animated.spring(scaleAnim, {
+			toValue: 0.96,
+			useNativeDriver: true,
+			speed: 40,
+		}).start();
+	};
+
+	const handlePressOut = () => {
+		Animated.spring(scaleAnim, {
+			toValue: 1,
+			useNativeDriver: true,
+			speed: 40,
+		}).start();
+	};
+
 	return (
-		<TouchableOpacity
-			activeOpacity={0.8}
+		<Pressable
 			onPress={() => (editMode ? onToggleSelect(entry.id) : onPressOpen(entry))}
 			onLongPress={() => !editMode && onLongPress && onLongPress(entry)}
-			delayLongPress={100}
-			style={[
-				styles.row,
-				{
-					backgroundColor: isActiveHere ? theme.surfaceAlt : theme.surface,
-					borderColor: isActiveHere
-						? entry.categoryColor || theme.accent
-						: theme.border,
-					borderLeftWidth: 4,
-					borderLeftColor: entry.categoryColor || UNTAGGED_COLOR,
-				},
-			]}
+			delayLongPress={300}
+			onPressIn={handlePressIn}
+			onPressOut={handlePressOut}
 		>
+			<Animated.View
+				style={[
+					styles.row,
+					{
+						transform: [{ scale: scaleAnim }],
+						backgroundColor: isActiveHere ? theme.surfaceAlt : theme.surface,
+						borderColor: isActiveHere
+							? entry.categoryColor || theme.accent
+							: theme.border,
+						borderLeftWidth: 4,
+						borderLeftColor: entry.categoryColor || UNTAGGED_COLOR,
+					},
+				]}
+			>
 			<View style={styles.topLine}>
 				<View style={{ flex: 1 }}>
 					<Text
@@ -54,16 +85,11 @@ export default React.memo(function EntryRow({
 							<MaterialCommunityIcons name={iconForCategory({ icon: entry.categoryIcon || UNTAGGED_ICON })} size={12} color={theme.textMuted} />
 							<Text style={[styles.subtitle, { color: theme.textMuted, marginTop: 0, marginLeft: 4 }]}>
 								{entry.categoryName || 'Untagged'}
-								{!editMode && ` · ${showAbsoluteDate ? fullDateTimeLabel(entry.updatedAt) : timeLabel(entry.updatedAt)}`}
+								{` · ${timeLabel(entry.updatedAt)}`}
 							</Text>
 						</View>
-						{editMode && (
-							<Text style={[styles.subtitle, { color: theme.textMuted, marginTop: 2 }]}>
-								{showAbsoluteDate ? fullDateTimeLabel(entry.updatedAt) : timeLabel(entry.updatedAt)}
-							</Text>
-						)}
 					</View>
-					{!editMode && (entry.transcript ? (
+					{entry.transcript ? (
 						<Text style={[styles.transcriptSnippet, { color: theme.textMuted }]} numberOfLines={1}>
 							"{entry.transcript}"
 						</Text>
@@ -72,37 +98,58 @@ export default React.memo(function EntryRow({
 							<Feather name="loader" size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
 							<Text style={{ fontSize: 12, color: theme.textMuted, fontStyle: 'italic' }}>Transcribing...</Text>
 						</View>
-					) : null)}
+					) : null}
 				</View>
 
 				<Text style={[styles.duration, { color: theme.textMuted }]}>
 					{formatDuration(entry.totalDurationMs)}
 				</Text>
 
-				{editMode ? (
-					<TouchableOpacity
-						onPress={() => onToggleSelect(entry.id)}
-						style={styles.checkboxWrap}
+				<View style={{ width: 36, height: 36 }}>
+					{/* Play Button */}
+					<Animated.View 
+						style={[
+							StyleSheet.absoluteFill, 
+							{ opacity: editAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }
+						]} 
+						pointerEvents={editMode ? 'none' : 'auto'}
 					>
-						<Feather
-							name={selected ? 'check-square' : 'square'}
-							size={22}
-							color={selected ? theme.accent : theme.textMuted}
-						/>
-					</TouchableOpacity>
-				) : (
-					<TouchableOpacity
-						onPress={() => onPressPlay(entry)}
-						style={[styles.playBtn, { backgroundColor: isActiveHere ? theme.accent : theme.surfaceAlt }]}
+						<TouchableOpacity
+							onPress={() => onPressPlay(entry)}
+							style={[styles.playBtn, { backgroundColor: isActiveHere ? theme.accent : theme.surfaceAlt }]}
+						>
+							<Feather
+								name={isPlayingHere ? 'pause' : 'play'}
+								size={16}
+								color={isActiveHere ? theme.accentDeep : theme.text}
+								style={isPlayingHere ? undefined : { marginLeft: 2 }}
+							/>
+						</TouchableOpacity>
+					</Animated.View>
+
+					{/* Checkbox */}
+					<Animated.View 
+						style={[
+							StyleSheet.absoluteFill, 
+							{ 
+								opacity: editAnim, 
+								transform: [{ scale: editAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] 
+							}
+						]} 
+						pointerEvents={editMode ? 'auto' : 'none'}
 					>
-						<Feather
-							name={isPlayingHere ? 'pause' : 'play'}
-							size={16}
-							color={isActiveHere ? theme.accentDeep : theme.text}
-							style={isPlayingHere ? undefined : { marginLeft: 2 }}
-						/>
-					</TouchableOpacity>
-				)}
+						<TouchableOpacity
+							onPress={() => onToggleSelect(entry.id)}
+							style={styles.checkboxWrap}
+						>
+							<Feather
+								name={selected ? 'check-square' : 'square'}
+								size={22}
+								color={selected ? theme.accent : theme.textMuted}
+							/>
+						</TouchableOpacity>
+					</Animated.View>
+				</View>
 			</View>
 
 			{isActiveHere && (
@@ -127,7 +174,8 @@ export default React.memo(function EntryRow({
 					</View>
 				</View>
 			)}
-		</TouchableOpacity>
+			</Animated.View>
+		</Pressable>
 	);
 });
 
