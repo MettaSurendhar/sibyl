@@ -72,6 +72,8 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 	const editMode = isEditMode || false;
 	const setEditMode = onEditModeChange || (() => {});
 	const editAnim = useRef(new Animated.Value(editMode ? 1 : 0)).current;
+	const searchAnim = useRef(new Animated.Value(0)).current;
+	const searchInputAnim = useRef(new Animated.Value(0)).current;
 
 	useEffect(() => {
 		Animated.spring(editAnim, {
@@ -81,6 +83,27 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			tension: 60,
 		}).start();
 	}, [editMode, editAnim]);
+
+	useEffect(() => {
+		Animated.spring(searchAnim, {
+			toValue: searchOpen ? 1 : 0,
+			useNativeDriver: false,
+			friction: 9,
+			tension: 80,
+		}).start();
+		if (!searchOpen) {
+			searchInputAnim.setValue(0);
+		}
+	}, [searchOpen]);
+
+	useEffect(() => {
+		Animated.spring(searchInputAnim, {
+			toValue: searchMode ? 1 : 0,
+			useNativeDriver: false,
+			friction: 9,
+			tension: 80,
+		}).start();
+	}, [searchMode]);
 	const [selectedIds, setSelectedIds] = useState([]);
 	const [activeEntryId, setActiveEntryId] = useState(null);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -513,7 +536,13 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			)}
 
 			{!editMode && searchOpen && (
-				<View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 }}>
+				<Animated.View style={{
+					overflow: 'hidden',
+					opacity: searchAnim,
+					maxHeight: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 160] }),
+					transform: [{ translateY: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+				}}>
+					<View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 }}>
 					<View style={{ flexDirection: 'row', gap: 10, marginBottom: searchMode ? 14 : 4 }}>
 						<TouchableOpacity
 							onPress={() => setSearchMode('record')}
@@ -532,6 +561,11 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 					</View>
 
 					{searchMode && (
+						<Animated.View style={{
+							overflow: 'hidden',
+							opacity: searchInputAnim,
+							maxHeight: searchInputAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 56] }),
+						}}>
 						<View
 							style={[
 								styles.searchWrap,
@@ -562,8 +596,10 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 								</TouchableOpacity>
 							)}
 						</View>
+						</Animated.View>
 					)}
 				</View>
+				</Animated.View>
 			)}
 
 			<SectionList

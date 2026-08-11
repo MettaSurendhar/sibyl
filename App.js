@@ -55,15 +55,23 @@ function Root() {
 	return (
 		<NavigationContainer>
 			<StatusBar style={theme.isDark ? 'light' : 'dark'} />
-			<Stack.Navigator screenOptions={{ headerShown: false }}>
+			<Stack.Navigator
+				screenOptions={{
+					headerShown: false,
+					animation: 'slide_from_right',
+					animationDuration: 280,
+					contentStyle: { backgroundColor: theme.bg },
+				}}
+			>
 				<Stack.Screen
 					name='Main'
 					component={HomeLibraryPager}
+					options={{ animation: 'none' }}
 				/>
 				<Stack.Screen
 					name='Record'
 					component={RecordScreen}
-					options={{ presentation: 'modal' }}
+					options={{ animation: 'slide_from_bottom', animationDuration: 320 }}
 				/>
 				<Stack.Screen
 					name='Playback'

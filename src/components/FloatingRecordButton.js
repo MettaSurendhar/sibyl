@@ -6,6 +6,7 @@ import Animated, {
 	useAnimatedStyle,
 	withSpring,
 	withTiming,
+	withSequence,
 	runOnJS,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -41,6 +42,9 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 	const isDragging = useSharedValue(false);
 	const scale = useSharedValue(1);
 	const visibilityScale = useSharedValue(visible ? 1 : 0);
+	
+	const rippleScale = useSharedValue(1);
+	const rippleOpacity = useSharedValue(0);
 
 	useEffect(() => {
 		visibilityScale.value = withSpring(visible ? 1 : 0, {
@@ -117,7 +121,21 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 	const tap = Gesture.Tap()
 		.maxDuration(250)
 		.onEnd((_, success) => {
-			if (success) runOnJS(onPress)();
+			if (success) {
+				// Micro-interaction: scale bounce
+				scale.value = withSequence(
+					withTiming(1.15, { duration: 100 }),
+					withSpring(1, { damping: 10, stiffness: 300 })
+				);
+				
+				// Micro-interaction: ripple burst
+				rippleScale.value = 1;
+				rippleOpacity.value = 0.5;
+				rippleScale.value = withTiming(2.5, { duration: 400 });
+				rippleOpacity.value = withTiming(0, { duration: 400 });
+
+				runOnJS(onPress)();
+			}
 		});
 
 	const composed = Gesture.Race(tap, Gesture.Simultaneous(longPress, pan));
@@ -133,6 +151,19 @@ export default function FloatingRecordButton({ onPress, bottomOffset = 24, visib
 	return (
 		<GestureDetector gesture={composed}>
 			<Animated.View style={[styles.container, animatedStyle]}>
+				{/* Expanding ripple effect */}
+				<Animated.View
+					style={[
+						StyleSheet.absoluteFill,
+						{
+							backgroundColor: theme.accent,
+							borderRadius: BUTTON_SIZE / 2,
+							transform: [{ scale: rippleScale }],
+							opacity: rippleOpacity,
+						},
+					]}
+				/>
+
 				{/* Halo ring to lift it off the dark background */}
 				<View style={[styles.halo, { borderColor: theme.accent }]} />
 

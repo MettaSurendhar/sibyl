@@ -4,6 +4,7 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	BackHandler,
+	Animated,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -57,6 +58,18 @@ export default function RecordScreen({ navigation }) {
 	const [folderHintVisible, setFolderHintVisible] = useState(false);
 	const recorderRef = useRef(null);
 	const pendingResultRef = useRef(null);
+	
+	const mountAnim = useRef(new Animated.Value(0)).current;
+	const recordBtnScale = useRef(new Animated.Value(1)).current;
+
+	useEffect(() => {
+		Animated.spring(mountAnim, {
+			toValue: 1,
+			useNativeDriver: true,
+			tension: 60,
+			friction: 8,
+		}).start();
+	}, []);
 
 	const refreshCategories = useCallback(
 		() => listCategories().then(setCategories),
@@ -112,6 +125,11 @@ export default function RecordScreen({ navigation }) {
 	}
 
 	async function handleStart() {
+		Animated.sequence([
+			Animated.timing(recordBtnScale, { toValue: 1.15, duration: 100, useNativeDriver: true }),
+			Animated.spring(recordBtnScale, { toValue: 1, friction: 5, useNativeDriver: true })
+		]).start();
+
 		recorderRef.current = createRecorder({
 			// expo-av's metering callback isn't guaranteed to fire exactly every 100ms - under load
 			// it can skip a beat, which was the real cause of waveforms falling short of the actual
@@ -221,10 +239,15 @@ export default function RecordScreen({ navigation }) {
 	);
 
 	return (
-		<View
+		<Animated.View
 			style={[
 				styles.container,
-				{ backgroundColor: theme.bg, paddingTop: insets.top + 20 },
+				{ 
+					backgroundColor: theme.bg, 
+					paddingTop: insets.top + 20,
+					opacity: mountAnim,
+					transform: [{ translateY: mountAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }]
+				},
 			]}
 		>
 			<Text style={[styles.sessionTitle, { color: theme.textMuted }]}>
@@ -290,12 +313,14 @@ export default function RecordScreen({ navigation }) {
 
 			<View style={styles.controls}>
 				{status === 'idle' && (
-					<TouchableOpacity
-						style={[styles.recordBtn, { backgroundColor: theme.accent }]}
-						onPress={handleStart}
-					>
-						<View style={styles.recordDot} />
-					</TouchableOpacity>
+					<Animated.View style={{ transform: [{ scale: recordBtnScale }] }}>
+						<TouchableOpacity
+							style={[styles.recordBtn, { backgroundColor: theme.accent }]}
+							onPress={handleStart}
+						>
+							<View style={styles.recordDot} />
+						</TouchableOpacity>
+					</Animated.View>
 				)}
 
 				{(status === 'recording' || status === 'paused') && (
@@ -371,7 +396,7 @@ export default function RecordScreen({ navigation }) {
 				onCancel={() => setDiscardModalVisible(false)}
 				onConfirm={confirmDiscard}
 			/>
-		</View>
+		</Animated.View>
 	);
 }
 

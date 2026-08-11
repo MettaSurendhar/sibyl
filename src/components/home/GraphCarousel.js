@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, TouchableOpacity, Dimensions, StyleSheet, Animated } from 'react-native';
 import Text from '../../theme/Text';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
@@ -35,13 +35,37 @@ export default function GraphCarousel({
 }) {
 	const { theme } = useTheme();
 	const [activeTab, setActiveTab] = useState('line');
+	const [renderedTab, setRenderedTab] = useState('line');
 	const [lineDays, setLineDays] = useState(14);
+
+	const fadeAnim = useRef(new Animated.Value(1)).current;
+	const tabScales = useRef(TABS.map((_, i) => new Animated.Value(i === 0 ? 1 : 0.85))).current;
+
+	useEffect(() => {
+		if (activeTab !== renderedTab) {
+			Animated.sequence([
+				Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+			]).start(() => {
+				setRenderedTab(activeTab);
+				Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+			});
+		}
+		
+		TABS.forEach((tab, i) => {
+			Animated.spring(tabScales[i], {
+				toValue: activeTab === tab.key ? 1 : 0.85,
+				useNativeDriver: true,
+				tension: 120,
+				friction: 7,
+			}).start();
+		});
+	}, [activeTab]);
 
 	return (
 		<View style={styles.wrap}>
 			{/* Chart content */}
-			<View style={[styles.chartContainer, { borderColor: theme.border }]}>
-				{activeTab === 'line' && (
+			<Animated.View style={[styles.chartContainer, { borderColor: theme.border, opacity: fadeAnim }]}>
+				{renderedTab === 'line' && (
 					<>
 						<View style={styles.timeSelectorRow}>
 							{TIME_OPTIONS.map((opt) => (
@@ -72,23 +96,23 @@ export default function GraphCarousel({
 						/>
 					</>
 				)}
-				{activeTab === 'pie' && (
+				{renderedTab === 'pie' && (
 					<TagPieChart
 						slices={pieSlices}
 						width={CHART_WIDTH}
 					/>
 				)}
-				{activeTab === 'heatmap' && (
+				{renderedTab === 'heatmap' && (
 					<ActivityHeatmap
 						dailyRows={dailyRows}
 						width={CHART_WIDTH}
 					/>
 				)}
-			</View>
+			</Animated.View>
 
 			{/* Tab buttons */}
 			<View style={styles.tabRow}>
-				{TABS.map((tab) => {
+				{TABS.map((tab, index) => {
 					const active = activeTab === tab.key;
 					return (
 						<TouchableOpacity
@@ -103,7 +127,9 @@ export default function GraphCarousel({
 							]}
 							activeOpacity={0.7}
 						>
-							<Feather name={tab.icon} size={20} color={active ? theme.bg : theme.textMuted} />
+							<Animated.View style={{ transform: [{ scale: tabScales[index] }] }}>
+								<Feather name={tab.icon} size={20} color={active ? theme.bg : theme.textMuted} />
+							</Animated.View>
 						</TouchableOpacity>
 					);
 				})}
