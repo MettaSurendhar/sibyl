@@ -33,6 +33,9 @@ class MediaControllerSingleton {
 			case 'save':
 				this.activeHandler.onSave?.();
 				break;
+			case 'discard':
+				this.activeHandler.onDiscard?.();
+				break;
 		}
 	}
 }

@@ -60,7 +60,8 @@
         }
       ],
       "./plugins/withFfmpegKitFix.js",
-      "./plugins/withNotifee.js"
+      "./plugins/withNotifee.js",
+      "./plugins/withNotificationIcons.js"
     ],
     "extra": {
       "eas": {

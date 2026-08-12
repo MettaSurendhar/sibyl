@@ -62,6 +62,7 @@ export default function RecordScreen({ navigation }) {
 	const pendingResultRef = useRef(null);
 	const samplesRef = useRef([]); // track fresh samples for background save
 	const statusRef = useRef('idle'); // track fresh status for background controls
+	const elapsedRef = useRef(0); // track fresh elapsed time for background controls
 	
 	const mountAnim = useRef(new Animated.Value(0)).current;
 	const recordBtnScale = useRef(new Animated.Value(1)).current;
@@ -100,6 +101,11 @@ export default function RecordScreen({ navigation }) {
 					if (statusRef.current === 'recording' || statusRef.current === 'paused') {
 						saveBackground();
 					}
+				},
+				onDiscard: () => {
+					if (statusRef.current === 'recording' || statusRef.current === 'paused') {
+						discardBackground();
+					}
 				}
 			});
 			return () => {
@@ -126,10 +132,16 @@ export default function RecordScreen({ navigation }) {
 
 	async function confirmDiscard() {
 		setDiscardModalVisible(false);
+		await discardBackground();
+	}
+
+	async function discardBackground() {
 		await recorderRef.current?.discard();
 		setStatus('idle');
 		setSamples([]);
 		setElapsedMs(0);
+		elapsedRef.current = 0;
+		NotificationService.stopNotification();
 	}
 
 	// Nudges the user, once per recording session at most, to connect a Saving folder if they
@@ -176,6 +188,7 @@ export default function RecordScreen({ navigation }) {
 					return nextSamples;
 				});
 				setElapsedMs(ms);
+				elapsedRef.current = ms;
 				NotificationService.startRecordingNotification(true, ms);
 			},
 		});
@@ -184,6 +197,7 @@ export default function RecordScreen({ navigation }) {
 			setStatus('recording');
 			setSamples([]);
 			setElapsedMs(0);
+			elapsedRef.current = 0;
 			maybeShowFolderHint();
 		} catch (e) {
 			alert('Could not start recording', e.message);
@@ -193,13 +207,13 @@ export default function RecordScreen({ navigation }) {
 	async function handlePause() {
 		await recorderRef.current?.pause();
 		setStatus('paused');
-		NotificationService.startRecordingNotification(false, elapsedMs);
+		NotificationService.startRecordingNotification(false, elapsedRef.current, true);
 	}
 
 	async function handleResume() {
 		await recorderRef.current?.resume();
 		setStatus('recording');
-		NotificationService.startRecordingNotification(true, elapsedMs);
+		NotificationService.startRecordingNotification(true, elapsedRef.current, true);
 	}
 
 	async function handleStop() {

@@ -1,3 +1,4 @@
+import './src/services/NotificationService'; // Register Notifee background event early
 import React, { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFonts, PlayfairDisplay_400Regular, PlayfairDisplay_500Medium, PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
@@ -16,7 +17,6 @@ import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { AlertProvider } from './src/theme/AlertContext';
 import { getDb } from './src/db/database';
 import HomeLibraryPager from './src/navigation/HomeLibraryPager';
-import './src/services/NotificationService'; // Register Notifee background event early
 import RecordScreen from './src/screens/RecordScreen';
 import PlaybackScreen from './src/screens/PlaybackScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';

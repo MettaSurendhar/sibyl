@@ -120,51 +120,56 @@ export default function PlaybackScreen({ route, navigation }) {
 				
 				NotificationService.startPlaybackNotification(e.name || 'Untagged', false, 0, e.totalDurationMs);
 				
+				// positionRef keeps the latest position so bg notification actions
+				// can pass the correct time even without React state access
+				const positionRef = { current: 0 };
+
 				playerRef.current = createPlayer({
 					segments: e.segments,
 					onStatus: (s) => {
+						positionRef.current = s.positionMs;
 						setPositionMs(s.positionMs);
 						if (s.finished) setIsPlaying(false);
-						
+
 						NotificationService.updatePlaybackProgress(
-							e.name || 'Untagged', 
-							s.isPlaying, 
-							s.positionMs, 
+							e.name || 'Untagged',
+							s.isPlaying,
+							s.positionMs,
 							e.totalDurationMs
 						);
 					},
 				});
 				
-				// Keep track of latest position for seek actions
-				let lastPosMs = 0;
-				const updatePos = (pos) => { lastPosMs = pos; return pos; };
-				setPositionMs(updatePos); // Just to grab current state if needed, but onStatus updates it better. Actually we can rely on state for re-registering or just use the local let since onStatus closure isn't stale for lastPosMs? 
-				// Wait, onStatus is a closure that gets the INITIAL state. No, it gets `setPositionMs` which is stable. 
-				// To keep lastPosMs accurate, let's wrap setPositionMs.
-			});
-			
-			// Register controller actions
-			MediaController.register({
-				onPlay: () => {
-					playerRef.current?.play();
-					setIsPlaying(true);
-				},
-				onPause: () => {
-					playerRef.current?.pause();
-					setIsPlaying(false);
-				},
-				onFwd: () => {
-					setPositionMs(prev => {
-						playerRef.current?.seek(prev + 15000);
-						return prev;
-					});
-				},
-				onBwd: () => {
-					setPositionMs(prev => {
-						playerRef.current?.seek(prev - 15000);
-						return prev;
-					});
-				}
+				// Register controller actions — these fire from the notification buttons
+				// even when app is in background.
+				MediaController.register({
+					onPlay: () => {
+						playerRef.current?.play();
+						setIsPlaying(true);
+						NotificationService.syncPlaybackState(
+							e.name || 'Untagged', true, positionRef.current, e.totalDurationMs
+						);
+					},
+					onPause: () => {
+						playerRef.current?.pause();
+						setIsPlaying(false);
+						NotificationService.syncPlaybackState(
+							e.name || 'Untagged', false, positionRef.current, e.totalDurationMs
+						);
+					},
+					onFwd: () => {
+						setPositionMs(prev => {
+							playerRef.current?.seek(prev + 15000);
+							return prev;
+						});
+					},
+					onBwd: () => {
+						setPositionMs(prev => {
+							playerRef.current?.seek(prev - 15000);
+							return prev;
+						});
+					}
+				});
 			});
 
 			return () => {
@@ -235,9 +240,15 @@ export default function PlaybackScreen({ route, navigation }) {
 		if (isPlaying) {
 			await playerRef.current?.pause();
 			setIsPlaying(false);
+			NotificationService.syncPlaybackState(
+				entry?.name || 'Untagged', false, positionMs, entry?.totalDurationMs || 0
+			);
 		} else {
 			await playerRef.current?.play();
 			setIsPlaying(true);
+			NotificationService.syncPlaybackState(
+				entry?.name || 'Untagged', true, positionMs, entry?.totalDurationMs || 0
+			);
 		}
 	}
 

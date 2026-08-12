@@ -8,25 +8,33 @@ module.exports = function withNotifee(config) {
 		const manifest = config.modResults.manifest;
 		const application = manifest.application[0];
 
+		// Ensure tools namespace exists
+		if (!manifest.$['xmlns:tools']) {
+			manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
+		}
+
 		if (!application.service) {
 			application.service = [];
 		}
 
-		const foregroundService = {
+		const existingServiceIndex = application.service.findIndex(
+			(s) => s.$?.['android:name'] === 'app.notifee.core.ForegroundService'
+		);
+
+		const serviceDef = {
 			$: {
 				'android:name': 'app.notifee.core.ForegroundService',
 				'android:exported': 'false',
 				'android:foregroundServiceType': 'mediaPlayback|microphone',
+				'tools:replace': 'android:foregroundServiceType',
 			},
 			'intent-filter': [{ action: [{ $: { 'android:name': 'app.notifee.core.ForegroundService' } }] }],
 		};
 
-		// Only add if not already present
-		const alreadyAdded = application.service.some(
-			(s) => s.$?.['android:name'] === 'app.notifee.core.ForegroundService'
-		);
-		if (!alreadyAdded) {
-			application.service.push(foregroundService);
+		if (existingServiceIndex >= 0) {
+			application.service[existingServiceIndex] = serviceDef;
+		} else {
+			application.service.push(serviceDef);
 		}
 
 		return config;
