@@ -18,7 +18,7 @@ class MediaControllerSingleton {
 	}
 
 	onAction(action) {
-		if (!this.activeHandler) return;
+		if (!this.activeHandler) return false;
 		switch (action) {
 			case 'play':
 				this.activeHandler.onPlay?.();
@@ -42,6 +42,7 @@ class MediaControllerSingleton {
 				this.activeHandler.onCancel?.();
 				break;
 		}
+		return true;
 	}
 }
 
