@@ -65,8 +65,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "aedfb425-d80b-4aec-b196-ec3250cc7e7c"
+        "projectId": "b62723b8-b20f-4d5f-b1bb-61066e4cb131"
       }
-    }
+    },
+    "owner": "msc_integrated"
   }
 }

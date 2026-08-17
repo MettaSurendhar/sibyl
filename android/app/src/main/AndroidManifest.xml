@@ -29,7 +29,8 @@
     <!-- react-native-track-player: native MediaStyle foreground service for lock screen + persistent controls -->
     <service android:name="com.doublesymmetry.trackplayer.service.MusicService"
       android:exported="false"
-      android:foregroundServiceType="mediaPlayback">
+      android:foregroundServiceType="mediaPlayback"
+      tools:replace="android:exported">
       <intent-filter>
         <action android:name="android.intent.action.MEDIA_BUTTON"/>
       </intent-filter>
