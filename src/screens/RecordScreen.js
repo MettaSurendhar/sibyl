@@ -37,6 +37,7 @@ import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
 import { NotificationService } from '../services/NotificationService';
 import { MediaController } from '../services/MediaController';
+import { AudioStore } from '../services/AudioStore';
 
 function formatCentis(ms) {
 	const totalCentis = Math.floor(ms / 10);
@@ -111,6 +112,7 @@ export default function RecordScreen({ navigation }) {
 			return () => {
 				MediaController.unregister();
 				NotificationService.stopNotification();
+				AudioStore.clearRecorder();
 			};
 		}, []) // uses refs for status/samples so empty deps is safe
 	);
@@ -141,6 +143,7 @@ export default function RecordScreen({ navigation }) {
 		setSamples([]);
 		setElapsedMs(0);
 		elapsedRef.current = 0;
+		AudioStore.clearRecorder();
 		NotificationService.stopNotification();
 	}
 
@@ -189,11 +192,13 @@ export default function RecordScreen({ navigation }) {
 				});
 				setElapsedMs(ms);
 				elapsedRef.current = ms;
+				AudioStore.updateRecording(ms, true);
 				NotificationService.startRecordingNotification(true, ms);
 			},
 		});
 		try {
 			await recorderRef.current.start();
+			AudioStore.setRecorder(recorderRef.current);
 			setStatus('recording');
 			setSamples([]);
 			setElapsedMs(0);
@@ -206,12 +211,14 @@ export default function RecordScreen({ navigation }) {
 
 	async function handlePause() {
 		await recorderRef.current?.pause();
+		AudioStore.updateRecording(elapsedRef.current, false);
 		setStatus('paused');
 		NotificationService.startRecordingNotification(false, elapsedRef.current, true);
 	}
 
 	async function handleResume() {
 		await recorderRef.current?.resume();
+		AudioStore.updateRecording(elapsedRef.current, true);
 		setStatus('recording');
 		NotificationService.startRecordingNotification(true, elapsedRef.current, true);
 	}
@@ -229,6 +236,7 @@ export default function RecordScreen({ navigation }) {
 	async function saveBackground() {
 		const result = await recorderRef.current?.stop();
 		setStatus('idle');
+		AudioStore.clearRecorder();
 		NotificationService.stopNotification();
 		if (!result) return;
 		pendingResultRef.current = { ...result, waveform: samplesRef.current };

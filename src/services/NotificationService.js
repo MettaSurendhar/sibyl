@@ -3,54 +3,99 @@ import notifee, {
 	AndroidVisibility,
 	AndroidForegroundServiceType,
 } from '@notifee/react-native';
-import { MediaController } from './MediaController';
+import { Audio } from 'expo-av';
+import { AudioStore } from './AudioStore';
 
-// ─── Channel IDs ──────────────────────────────────────────────────────────────
-// Suffixed with _v2 so Android creates NEW channels with DEFAULT importance.
-// Once a channel is created, its importance is locked by Android — the only
-// way to change it is to use a new channel ID (or reinstall the app).
-const PLAYBACK_CHANNEL_ID = 'playback_channel_v2';
+// ─── Channel IDs ─────────────────────────────────────────────────────────────
+// _v2 suffix forces Android to create NEW channels with DEFAULT importance.
 const RECORDING_CHANNEL_ID = 'recording_channel_v2';
-const NOTIFICATION_ID = 'media_notification';
+const NOTIFICATION_ID      = 'media_notification';
 
 // ─── Module state ─────────────────────────────────────────────────────────────
-let isServiceRunning = false;
+let isServiceRunning    = false;
 let lastProgressUpdateMs = 0;
-let channelsCreated = false;
+let channelsCreated     = false;
 
-// ─── Foreground service registration ──────────────────────────────────────────
-// MUST be called once at boot. The returned Promise must never resolve —
-// that is what keeps the Android Service alive until stopForegroundService().
-notifee.registerForegroundService(() => {
-	return new Promise(() => {});
-});
+// ─── Audio session ────────────────────────────────────────────────────────────
+// Call once at startup so that:
+//   • Our audio keeps playing in background
+//   • Starting our audio pauses other apps (Spotify, YouTube, etc.)
+export async function initAudioSession() {
+	await Audio.setAudioModeAsync({
+		allowsRecordingIOS: false,
+		playsInSilentModeIOS: true,
+		staysActiveInBackground: true,
+		// Android: take audio focus exclusively → other apps pause/duck
+		shouldDuckAndroid: false,
+		playThroughEarpieceAndroid: false,
+	});
+}
 
-// ─── Event handlers ───────────────────────────────────────────────────────────
+// ─── Foreground service ───────────────────────────────────────────────────────
+// Must be registered once at app boot. Returning a never-resolving Promise
+// keeps the Android foreground service alive indefinitely.
+notifee.registerForegroundService(() => new Promise(() => {}));
+
+// ─── Event routing ────────────────────────────────────────────────────────────
+// Both foreground and background events call the same handler.
+// When the app is visible, onForegroundEvent fires.
+// When backgrounded (foreground service keeps JS alive), onBackgroundEvent fires.
+// Both paths operate via AudioStore refs (module-level, always valid in the
+// same JS context) rather than React component refs (which can be stale/null).
+
+async function handleNotifeeAction(id) {
+	// Playback is now handled by react-native-track-player natively.
+	// This handler only deals with recording notification actions.
+	const recorder = AudioStore.getRecorder();
+
+	switch (id) {
+		case 'play':
+			if (recorder && !AudioStore.isRecording()) {
+				await recorder.resume();
+				AudioStore.updateRecording(AudioStore.getRecordingElapsedMs(), true);
+				await NotificationService.startRecordingNotification(true, AudioStore.getRecordingElapsedMs(), true);
+			}
+			break;
+		case 'pause':
+			if (recorder && AudioStore.isRecording()) {
+				await recorder.pause();
+				AudioStore.updateRecording(AudioStore.getRecordingElapsedMs(), false);
+				await NotificationService.startRecordingNotification(false, AudioStore.getRecordingElapsedMs(), true);
+			}
+			break;
+		case 'save':
+			// Save is handled by the screen's MediaController handler only
+			// (it needs to finalise the file, navigate, etc.)
+			break;
+		case 'discard':
+			if (recorder) {
+				await recorder.discard();
+				AudioStore.clearRecorder();
+				await NotificationService.stopNotification();
+			}
+			break;
+	}
+}
+
 notifee.onBackgroundEvent(async ({ type, detail }) => {
 	if (type === 2) { // EventType.ACTION_PRESS
 		const id = detail.pressAction?.id;
-		if (id) MediaController.onAction(id);
+		if (id) await handleNotifeeAction(id);
 	}
 });
 
 notifee.onForegroundEvent(({ type, detail }) => {
 	if (type === 2) { // EventType.ACTION_PRESS
 		const id = detail.pressAction?.id;
-		if (id) MediaController.onAction(id);
+		if (id) handleNotifeeAction(id);
 	}
 });
 
 // ─── Channel setup ────────────────────────────────────────────────────────────
-// DEFAULT importance = shows in status bar + on lock screen, no sound/vibration.
-// Channels are cached once created; this is idempotent after first call.
+// DEFAULT = shows in status bar + on lock screen, no sound/vibration.
 async function setupChannels() {
 	if (channelsCreated) return;
 	await notifee.requestPermission();
-	await notifee.createChannel({
-		id: PLAYBACK_CHANNEL_ID,
-		name: 'Media Playback',
-		importance: AndroidImportance.DEFAULT,
-	});
 	await notifee.createChannel({
 		id: RECORDING_CHANNEL_ID,
 		name: 'Voice Recording',
@@ -61,79 +106,34 @@ async function setupChannels() {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDuration(ms) {
-	if (isNaN(ms) || ms < 0) ms = 0;
+	if (!ms || isNaN(ms) || ms < 0) ms = 0;
 	const total = Math.floor(ms / 1000);
-	const mins = Math.floor(total / 60);
-	const secs = total % 60;
+	const mins  = Math.floor(total / 60);
+	const secs  = total % 60;
 	return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Background-safe press action — executes without opening/bringing up the app
+// Background-safe press action — pure BroadcastReceiver, no Activity launch.
+// CRITICAL: Do NOT set launchActivity to any value (including the string 'none').
+// Notifee's native code: if pressAction has launchActivity key (any value)
+//   → PendingIntent.getActivity() → demands unlock on lock screen + closes shade.
+// If launchActivity is completely absent (key missing)
+//   → PendingIntent.getBroadcast() → works on lock screen + shade stays open.
 function bgAction(id, title, icon) {
 	return {
 		title,
-		icon, // drawable resource name (no extension), e.g. 'notif_ic_play'
-		pressAction: {
-			id,
-			launchActivity: 'none', // do NOT open the app
-		},
+		icon,           // Android drawable resource name, e.g. 'notif_ic_play'
+		pressAction: { id },  // NO launchActivity key
 	};
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export const NotificationService = {
 
-	// Start (or update) the playback foreground notification immediately.
-	// This resets the throttle so the next progress update goes through.
-	async startPlaybackNotification(title, isPlaying, positionMs = 0, totalMs = 0) {
-		await setupChannels();
-		isServiceRunning = true;
-		lastProgressUpdateMs = Date.now();
-
-		await notifee.displayNotification({
-			id: NOTIFICATION_ID,
-			title: title || 'Playing audio',
-			body: `${formatDuration(positionMs)} / ${formatDuration(totalMs)}`,
-			android: {
-				channelId: PLAYBACK_CHANNEL_ID,
-				asForegroundService: true,
-				foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK],
-				ongoing: true,
-				onlyAlertOnce: true,
-				// PUBLIC = show in full on lock screen
-				visibility: AndroidVisibility.PUBLIC,
-				color: '#10B981',
-				actions: [
-					bgAction('bwd', 'Back 15s', 'notif_ic_backward'),
-					isPlaying
-						? bgAction('pause', 'Pause', 'notif_ic_pause')
-						: bgAction('play', 'Play', 'notif_ic_play'),
-					bgAction('fwd', 'Skip 15s', 'notif_ic_forward'),
-				],
-			},
-		});
-	},
-
-	// Called from onStatus (~100ms). Throttled to every 2s to prevent flicker.
-	async updatePlaybackProgress(title, isPlaying, positionMs, totalMs) {
-		if (!isServiceRunning) return;
-		const now = Date.now();
-		if (now - lastProgressUpdateMs < 2000) return;
-		await this.startPlaybackNotification(title, isPlaying, positionMs, totalMs);
-	},
-
-	// Called immediately on play/pause button press (bypasses throttle).
-	// Ensures the notification reflects the new state right away.
-	async syncPlaybackState(title, isPlaying, positionMs, totalMs) {
-		if (!isServiceRunning) return;
-		await this.startPlaybackNotification(title, isPlaying, positionMs, totalMs);
-	},
-
-	// Start (or tick) the recording notification.
-	// isStatChange=true bypasses the 1s throttle for immediate button feedback.
+	// Recording notification.
+	// isStateChange=true bypasses the 1s throttle for immediate feedback.
 	async startRecordingNotification(isPlaying, durationMs = 0, isStateChange = false) {
 		const now = Date.now();
-		// Throttle ticker updates (onMeter fires every 100ms)
 		if (!isStateChange && now - lastProgressUpdateMs < 1000) return;
 		lastProgressUpdateMs = now;
 
@@ -142,7 +142,7 @@ export const NotificationService = {
 
 		await notifee.displayNotification({
 			id: NOTIFICATION_ID,
-			title: 'Recording...',
+			title: 'Recording…',
 			body: formatDuration(durationMs),
 			android: {
 				channelId: RECORDING_CHANNEL_ID,
@@ -154,9 +154,9 @@ export const NotificationService = {
 				color: '#EF4444',
 				actions: [
 					isPlaying
-						? bgAction('pause', 'Pause', 'notif_ic_pause')
-						: bgAction('play', 'Resume', 'notif_ic_play'),
-					bgAction('save', 'Save', 'notif_ic_save'),
+						? bgAction('pause',   'Pause',   'notif_ic_pause')
+						: bgAction('play',    'Resume',  'notif_ic_play'),
+					bgAction('save',    'Save',    'notif_ic_save'),
 					bgAction('discard', 'Discard', 'notif_ic_discard'),
 				],
 			},
@@ -164,7 +164,7 @@ export const NotificationService = {
 	},
 
 	async stopNotification() {
-		isServiceRunning = false;
+		isServiceRunning     = false;
 		lastProgressUpdateMs = 0;
 		try { await notifee.stopForegroundService(); } catch (_) {}
 		try { await notifee.cancelNotification(NOTIFICATION_ID); } catch (_) {}

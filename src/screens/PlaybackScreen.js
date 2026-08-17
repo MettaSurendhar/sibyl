@@ -26,7 +26,8 @@ import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import PlaybackSettingsSheet from '../components/PlaybackSettingsSheet';
 import EntryTagSheet from '../components/EntryTagSheet';
-import { createPlayer } from '../audio/player';
+import { createPlayer, computeSilenceRanges } from '../audio/player';
+import TrackPlayer from 'react-native-track-player';
 import { formatDuration } from '../utils/format';
 import {
 	getEntry,
@@ -53,8 +54,6 @@ import {
 } from '../utils/externalFolder';
 import { transcribeSegments, languageDisplayName } from '../groq/transcribe';
 import { PlaybackSlider } from '../components/CustomProgressBar';
-import { NotificationService } from '../services/NotificationService';
-import { MediaController } from '../services/MediaController';
 
 // Page 2's "no API key" case is by far the most common failure - give it a distinct sentinel
 // so the warning under the Transcribe button can show a tappable Settings link instead of a
@@ -118,64 +117,17 @@ export default function PlaybackScreen({ route, navigation }) {
 			load().then((e) => {
 				if (cancelled || !e) return;
 				
-				NotificationService.startPlaybackNotification(e.name || 'Untagged', false, 0, e.totalDurationMs);
-				
-				// positionRef keeps the latest position so bg notification actions
-				// can pass the correct time even without React state access
-				const positionRef = { current: 0 };
-
 				playerRef.current = createPlayer({
 					segments: e.segments,
 					onStatus: (s) => {
-						positionRef.current = s.positionMs;
 						setPositionMs(s.positionMs);
 						if (s.finished) setIsPlaying(false);
-
-						NotificationService.updatePlaybackProgress(
-							e.name || 'Untagged',
-							s.isPlaying,
-							s.positionMs,
-							e.totalDurationMs
-						);
 					},
-				});
-				
-				// Register controller actions — these fire from the notification buttons
-				// even when app is in background.
-				MediaController.register({
-					onPlay: () => {
-						playerRef.current?.play();
-						setIsPlaying(true);
-						NotificationService.syncPlaybackState(
-							e.name || 'Untagged', true, positionRef.current, e.totalDurationMs
-						);
-					},
-					onPause: () => {
-						playerRef.current?.pause();
-						setIsPlaying(false);
-						NotificationService.syncPlaybackState(
-							e.name || 'Untagged', false, positionRef.current, e.totalDurationMs
-						);
-					},
-					onFwd: () => {
-						setPositionMs(prev => {
-							playerRef.current?.seek(prev + 15000);
-							return prev;
-						});
-					},
-					onBwd: () => {
-						setPositionMs(prev => {
-							playerRef.current?.seek(prev - 15000);
-							return prev;
-						});
-					}
 				});
 			});
 
 			return () => {
 				cancelled = true;
-				MediaController.unregister();
-				NotificationService.stopNotification();
 				playerRef.current?.unload();
 				playerRef.current = null;
 			};
@@ -240,15 +192,9 @@ export default function PlaybackScreen({ route, navigation }) {
 		if (isPlaying) {
 			await playerRef.current?.pause();
 			setIsPlaying(false);
-			NotificationService.syncPlaybackState(
-				entry?.name || 'Untagged', false, positionMs, entry?.totalDurationMs || 0
-			);
 		} else {
 			await playerRef.current?.play();
 			setIsPlaying(true);
-			NotificationService.syncPlaybackState(
-				entry?.name || 'Untagged', true, positionMs, entry?.totalDurationMs || 0
-			);
 		}
 	}
 
@@ -263,12 +209,17 @@ export default function PlaybackScreen({ route, navigation }) {
 
 	async function changeSpeed(newSpeed) {
 		setSpeed(newSpeed);
-		await playerRef.current?.setRate(newSpeed);
+		try {
+			await TrackPlayer.setRate(newSpeed);
+		} catch (e) {
+			console.warn('setRate failed:', e);
+		}
 	}
 
 	function toggleSkipSilence(next) {
 		setSkipSilence(next);
-		playerRef.current?.setSkipSilence(next, entry.waveform);
+		const ranges = next ? computeSilenceRanges(entry.waveform || []) : [];
+		playerRef.current?.setSkipSilence(next, ranges);
 	}
 
 	// --- 3-dot menu actions ---

@@ -1,11 +1,15 @@
-import { Audio } from 'expo-av';
+import TrackPlayer, {
+  Capability,
+  State,
+  AppKilledPlaybackBehavior,
+  RepeatMode,
+} from 'react-native-track-player';
 
-const SAMPLE_INTERVAL_MS = 100; // matches recorder.js progress update interval
+const SAMPLE_INTERVAL_MS = 100;
 const SILENCE_DB_THRESHOLD = -45;
 const MIN_SILENCE_MS = 700;
 
-// Finds [startMs, endMs] ranges in the waveform that are quiet for at least MIN_SILENCE_MS.
-// Used only when the "Skip silence" toggle is on.
+// Computes quiet ranges from a waveform for the "Skip Silence" feature.
 export function computeSilenceRanges(waveform) {
   const ranges = [];
   let runStart = null;
@@ -21,169 +25,214 @@ export function computeSilenceRanges(waveform) {
   return ranges;
 }
 
-// Plays a list of segments [{uri, durationMs}] as one continuous timeline.
-export function createPlayer({ segments, onStatus }) {
-  Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    staysActiveInBackground: true,
+let isPlayerSetup = false;
+
+async function ensureSetup() {
+  if (isPlayerSetup) return;
+  try {
+    await TrackPlayer.setupPlayer({
+      // Android: bufferSize = 5s, prevents gap at segment boundary
+      minBuffer: 5,
+      maxBuffer: 20,
+      backBuffer: 5,
+      waitForBuffer: true,
+    });
+    isPlayerSetup = true;
+  } catch (e) {
+    if (e.message && e.message.includes('already been initialized')) {
+      isPlayerSetup = true;
+    } else {
+      throw e;
+    }
+  }
+
+  await TrackPlayer.updateOptions({
+    android: {
+      appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+    },
+    capabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.SeekTo,
+    ],
+    compactCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+    ],
   });
-  let sound = null;
-  let currentIndex = 0;
-  let rate = 1.0;
+}
+
+// Module-level counter so unloaded players' intervals auto-stop.
+let activePlayerId = 0;
+
+/**
+ * Creates a player that plays a list of segments [{uri, durationMs}] as one
+ * seamless timeline using react-native-track-player.
+ *
+ * Returns { play, pause, seek, skip, setSkipSilence, unload }.
+ * The onStatus callback receives { finished, positionMs, totalDurationMs, isPlaying }.
+ */
+export function createPlayer({ segments, onStatus }) {
+  const myId = ++activePlayerId;
+  let destroyed = false;
   let skipSilence = false;
   let silenceRanges = [];
-  let offsetBeforeCurrent = 0; // ms of all previous segments combined
-  let transitioning = false; // guards against overlapping loadSegment/seek calls
-  let destroyed = false;
+  let tickInterval = null;
 
-  const totalDurationMs = segments.reduce((sum, s) => sum + s.durationMs, 0);
-
-  function segmentOffset(index) {
-    return segments.slice(0, index).reduce((sum, s) => sum + s.durationMs, 0);
+  // Cumulative segment start times in ms — built once.
+  const segmentStartMs = [];
+  let acc = 0;
+  for (const seg of segments) {
+    segmentStartMs.push(acc);
+    acc += seg.durationMs;
   }
+  const totalDurationMs = acc;
 
-  // expo-av can throw "Player does not exist" if a sound was unloaded (or is mid-unload)
-  // when another call reaches it - this wraps any native call so that case degrades to a
-  // no-op instead of becoming an unhandled promise rejection.
-  async function safely(fn) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (!String(e?.message || e).includes('Player does not exist')) {
-        console.warn('Player operation failed:', e);
-      }
-      return null;
-    }
-  }
+  // Convert segments to TrackPlayer track objects.
+  const tracks = segments.map((s, i) => ({
+    id: String(i),
+    url: s.uri,
+    title: 'Voice Recording',
+    artist: 'Voice Journal',
+    // duration in seconds — TrackPlayer uses this for the seekbar
+    duration: s.durationMs / 1000,
+  }));
 
-  async function loadSegment(index, initialPositionMs = 0) {
-    const soundToUnload = sound;
-    sound = null; // detach immediately so no other call can reach the outgoing sound
-    if (soundToUnload) {
-      await safely(() => soundToUnload.setOnPlaybackStatusUpdate(null));
-      await safely(() => soundToUnload.unloadAsync());
-    }
+  async function load() {
+    await ensureSetup();
     if (destroyed) return;
-    if (index >= segments.length) {
-      onStatus && onStatus({ finished: true, positionMs: totalDurationMs, totalDurationMs });
-      return;
-    }
-    currentIndex = index;
-    offsetBeforeCurrent = segmentOffset(index);
-    const created = await safely(async () => {
-      const { sound: s } = await Audio.Sound.createAsync(
-        { uri: segments[index].uri },
-        {
-          positionMillis: initialPositionMs,
-          rate,
-          shouldCorrectPitch: true,
-          shouldPlay: false,
-          progressUpdateIntervalMillis: 100,
-        }
-      );
-      return s;
-    });
-    if (destroyed || !created) return;
-    sound = created;
-    sound.setOnPlaybackStatusUpdate(handleStatus);
+    await TrackPlayer.reset();
+    await TrackPlayer.add(tracks);
+    await TrackPlayer.setRepeatMode(RepeatMode.Off);
+    startTicker();
   }
 
-  function handleStatus(status) {
-    if (destroyed || !status.isLoaded) return;
-    const globalPos = offsetBeforeCurrent + status.positionMillis;
-
-    if (status.didJustFinish) {
-      if (transitioning) return;
-      transitioning = true;
-      loadSegment(currentIndex + 1, 0)
-        .then(() => sound && play())
-        .catch((e) => console.warn('Auto-advance failed:', e))
-        .finally(() => (transitioning = false));
-      return;
-    }
-
-    // skip-silence: if we've entered a long silent stretch, jump to its end.
-    // Guarded so overlapping status ticks during the async seek can't trigger it twice.
-    if (skipSilence && status.isPlaying && !transitioning) {
-      const range = silenceRanges.find((r) => globalPos >= r[0] && globalPos < r[1] - 150);
-      if (range) {
-        transitioning = true;
-        seek(range[1])
-          .catch((e) => console.warn('Skip-silence seek failed:', e))
-          .finally(() => (transitioning = false));
+  // ─── Progress ticker ───────────────────────────────────────────────────────
+  // TrackPlayer events work well for seeking but don't give global position
+  // across segments. We poll every 100ms to compute it ourselves.
+  function startTicker() {
+    if (tickInterval) clearInterval(tickInterval);
+    tickInterval = setInterval(async () => {
+      if (destroyed || myId !== activePlayerId) {
+        clearInterval(tickInterval);
+        tickInterval = null;
         return;
       }
-    }
 
-    onStatus &&
-      onStatus({
-        finished: false,
-        positionMs: globalPos,
-        totalDurationMs,
-        isPlaying: status.isPlaying,
-      });
+      let stateObj, activeIndex, progress;
+      try {
+        [stateObj, activeIndex, progress] = await Promise.all([
+          TrackPlayer.getPlaybackState(),
+          TrackPlayer.getActiveTrackIndex(),
+          TrackPlayer.getProgress(),
+        ]);
+      } catch {
+        return; // player may be mid-reset
+      }
+
+      const currentState = stateObj?.state;
+      const isPlaying = currentState === State.Playing;
+
+      // Queue ended
+      if (currentState === State.Ended) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+        onStatus?.({ finished: true, positionMs: totalDurationMs, totalDurationMs, isPlaying: false });
+        return;
+      }
+
+      // Compute global position
+      const trackIdx = activeIndex ?? 0;
+      const posInSegMs = (progress?.position ?? 0) * 1000;
+      let globalPosMs = (segmentStartMs[trackIdx] ?? 0) + posInSegMs;
+      if (isNaN(globalPosMs) || globalPosMs < 0) globalPosMs = 0;
+
+      // Skip-silence: jump over quiet stretches
+      if (skipSilence && isPlaying) {
+        const range = silenceRanges.find(
+          (r) => globalPosMs >= r[0] && globalPosMs < r[1] - 150
+        );
+        if (range) {
+          seek(range[1]).catch(() => {});
+          return;
+        }
+      }
+
+      onStatus?.({ finished: false, positionMs: globalPosMs, totalDurationMs, isPlaying });
+    }, 100);
   }
 
+  // ─── Controls ─────────────────────────────────────────────────────────────
   async function play() {
-    if (!sound) await loadSegment(currentIndex);
-    if (sound) await safely(() => sound.playAsync());
+    if (destroyed) return;
+    await ensureSetup();
+    await TrackPlayer.play();
   }
 
   async function pause() {
-    if (sound) await safely(() => sound.pauseAsync());
+    if (destroyed) return;
+    await ensureSetup();
+    await TrackPlayer.pause();
   }
 
-  // seek to an absolute position (ms) within the whole concatenated entry
+  // Seek to absolute global position in ms.
   async function seek(globalMs) {
-    let clamped = Math.max(0, Math.min(globalMs, totalDurationMs - 1));
-    let idx = 0;
-    let acc = 0;
-    for (; idx < segments.length; idx++) {
-      if (clamped < acc + segments[idx].durationMs) break;
-      acc += segments[idx].durationMs;
+    if (destroyed) return;
+    const clamped = Math.max(0, Math.min(globalMs, totalDurationMs - 1));
+
+    // Find which segment this position falls in
+    let targetIdx = segments.length - 1;
+    for (let i = 0; i < segments.length; i++) {
+      if (clamped < segmentStartMs[i] + segments[i].durationMs) {
+        targetIdx = i;
+        break;
+      }
     }
-    
-    const segmentPosMs = clamped - acc;
-    
-    // If we're already playing the target segment, just seek the existing player
-    // This avoids unloading and reloading a massive file just to change position.
-    if (sound && idx === currentIndex) {
-      await safely(() => sound.setPositionAsync(segmentPosMs));
+    const posInSegMs = clamped - segmentStartMs[targetIdx];
+
+    const currentIdx = await TrackPlayer.getActiveTrackIndex();
+    if (currentIdx !== targetIdx) {
+      await TrackPlayer.skip(targetIdx);
+    }
+    await TrackPlayer.seekTo(posInSegMs / 1000);
+  }
+
+  // Relative skip (+/- ms from current position).
+  async function skip(deltaMs) {
+    if (destroyed) return;
+    let stateObj, activeIndex, progress;
+    try {
+      [stateObj, activeIndex, progress] = await Promise.all([
+        TrackPlayer.getPlaybackState(),
+        TrackPlayer.getActiveTrackIndex(),
+        TrackPlayer.getProgress(),
+      ]);
+    } catch {
       return;
     }
-
-    const priorStatus = sound ? await safely(() => sound.getStatusAsync()) : null;
-    const wasPlaying = priorStatus?.isLoaded ? priorStatus.isPlaying : false;
-    await loadSegment(idx, segmentPosMs);
-    if (wasPlaying) await play();
+    const trackIdx = activeIndex ?? 0;
+    const posInSegMs = (progress?.position ?? 0) * 1000;
+    const globalPosMs = (segmentStartMs[trackIdx] ?? 0) + posInSegMs;
+    await seek(globalPosMs + deltaMs);
   }
 
-  async function skip(deltaMs) {
-    const status = sound ? await safely(() => sound.getStatusAsync()) : null;
-    const current = status?.isLoaded ? offsetBeforeCurrent + status.positionMillis : 0;
-    await seek(current + deltaMs);
-  }
-
-  async function setRate(newRate) {
-    rate = newRate;
-    if (sound) await safely(() => sound.setRateAsync(rate, true));
-  }
-
-  function setSkipSilence(enabled, waveform) {
+  function setSkipSilence(enabled, ranges = []) {
     skipSilence = enabled;
-    silenceRanges = enabled ? computeSilenceRanges(waveform || []) : [];
+    silenceRanges = ranges;
   }
 
   async function unload() {
     destroyed = true;
-    const toUnload = sound;
-    sound = null;
-    if (toUnload) {
-      await safely(() => toUnload.setOnPlaybackStatusUpdate(null));
-      await safely(() => toUnload.unloadAsync());
+    if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
+    if (myId === activePlayerId) {
+      try { await TrackPlayer.reset(); } catch {}
     }
   }
 
-  return { play, pause, seek, skip, setRate, setSkipSilence, unload, totalDurationMs };
+  load().catch((e) => console.warn('Player load error:', e));
+
+  return { play, pause, seek, skip, setSkipSilence, unload };
 }

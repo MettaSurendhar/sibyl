@@ -10,7 +10,9 @@ class MediaControllerSingleton {
 	}
 
 	unregister(handler) {
-		if (this.activeHandler === handler) {
+		// If called with no argument, clear unconditionally (cleanup on unmount).
+		// If called with a handler, only clear if it's still the active one.
+		if (handler === undefined || this.activeHandler === handler) {
 			this.activeHandler = null;
 		}
 	}
@@ -35,6 +37,9 @@ class MediaControllerSingleton {
 				break;
 			case 'discard':
 				this.activeHandler.onDiscard?.();
+				break;
+			case 'cancel':
+				this.activeHandler.onCancel?.();
 				break;
 		}
 	}

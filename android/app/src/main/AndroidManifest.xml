@@ -26,6 +26,14 @@
         <action android:name="app.notifee.core.ForegroundService"/>
       </intent-filter>
     </service>
+    <!-- react-native-track-player: native MediaStyle foreground service for lock screen + persistent controls -->
+    <service android:name="com.doublesymmetry.trackplayer.service.MusicService"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback">
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON"/>
+      </intent-filter>
+    </service>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>

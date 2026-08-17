@@ -210,7 +210,7 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 
 	const togglePlayRef = useRef();
 	togglePlayRef.current = async (entry) => {
-		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+		// Toggle same entry
 		if (activeEntryId === entry.id) {
 			if (isPlaying) {
 				await playerRef.current?.pause();
@@ -221,21 +221,25 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 			}
 			return;
 		}
+
+		// Switch to a new entry — stop old player
 		await playerRef.current?.unload();
+
 		const player = createPlayer({
 			segments: entry.segments,
 			onStatus: (s) => {
 				setPlaybackPos(s.positionMs);
-				if (s.finished) setIsPlaying(false);
+				if (s.finished) {
+					setIsPlaying(false);
+				}
 			},
 		});
+
 		playerRef.current = player;
 		setActiveEntryId(entry.id);
 		setPlaybackPos(0);
 		setIsPlaying(true);
-		setTimeout(async () => {
-			await player.play();
-		}, 0);
+		await player.play();
 	};
 
 	const handlePressPlay = useCallback((entry) => togglePlayRef.current?.(entry), []);

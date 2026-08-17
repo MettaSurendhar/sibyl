@@ -1,4 +1,7 @@
-import './src/services/NotificationService'; // Register Notifee background event early
+import { initAudioSession } from './src/services/NotificationService';
+initAudioSession(); // Configures audio focus so starting our audio pauses other apps
+import TrackPlayer from 'react-native-track-player';
+TrackPlayer.registerPlaybackService(() => require('./src/services/PlaybackService'));
 import React, { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFonts, PlayfairDisplay_400Regular, PlayfairDisplay_500Medium, PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
