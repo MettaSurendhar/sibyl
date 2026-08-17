@@ -10,6 +10,17 @@ class RecordingNotificationModule(private val reactContext: ReactApplicationCont
 
     override fun getName(): String = "RecordingNotificationModule"
 
+    // Required for React Native built-in NativeEventEmitter
+    @ReactMethod
+    fun addListener(eventName: String) {
+        // Keep: Required for RN built-in Event Emitter Calls.
+    }
+
+    @ReactMethod
+    fun removeListeners(count: Int) {
+        // Keep: Required for RN built-in Event Emitter Calls.
+    }
+
     @ReactMethod
     fun startNotification(isPlaying: Boolean, durationMs: Int) {
         val intent = Intent(reactContext, RecordingNotificationService::class.java).apply {

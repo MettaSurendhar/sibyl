@@ -165,15 +165,19 @@ export function createPlayer({ segments, onStatus }) {
     }, 100);
   }
 
+  const loadPromise = load().catch((e) => console.warn('Player load error:', e));
+
   // ─── Controls ─────────────────────────────────────────────────────────────
   async function play() {
     if (destroyed) return;
+    await loadPromise;
     await ensureSetup();
     await TrackPlayer.play();
   }
 
   async function pause() {
     if (destroyed) return;
+    await loadPromise;
     await ensureSetup();
     await TrackPlayer.pause();
   }
@@ -181,6 +185,7 @@ export function createPlayer({ segments, onStatus }) {
   // Seek to absolute global position in ms.
   async function seek(globalMs) {
     if (destroyed) return;
+    await loadPromise;
     const clamped = Math.max(0, Math.min(globalMs, totalDurationMs - 1));
 
     // Find which segment this position falls in
@@ -203,6 +208,7 @@ export function createPlayer({ segments, onStatus }) {
   // Relative skip (+/- ms from current position).
   async function skip(deltaMs) {
     if (destroyed) return;
+    await loadPromise;
     let stateObj, activeIndex, progress;
     try {
       [stateObj, activeIndex, progress] = await Promise.all([
@@ -232,7 +238,5 @@ export function createPlayer({ segments, onStatus }) {
     }
   }
 
-  load().catch((e) => console.warn('Player load error:', e));
-
-  return { play, pause, seek, skip, setSkipSilence, unload };
+  return { play, pause, seek, skip, setSkipSilence, unload, ready: loadPromise };
 }
