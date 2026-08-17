@@ -121,6 +121,7 @@ export function createPlayer({ segments, onStatus }) {
         tickInterval = null;
         return;
       }
+      if (Date.now() < ignoreTicksUntil) return;
 
       let stateObj, activeIndex, progress;
       try {
@@ -138,8 +139,6 @@ export function createPlayer({ segments, onStatus }) {
 
       // Queue ended
       if (currentState === State.Ended) {
-        clearInterval(tickInterval);
-        tickInterval = null;
         onStatus?.({ finished: true, positionMs: totalDurationMs, totalDurationMs, isPlaying: false });
         return;
       }
@@ -172,7 +171,15 @@ export function createPlayer({ segments, onStatus }) {
     if (destroyed) return;
     await loadPromise;
     await ensureSetup();
+    let stateObj;
+    try { stateObj = await TrackPlayer.getPlaybackState(); } catch {}
+    if (stateObj?.state === State.Ended) {
+      // Restart from the beginning if ended
+      await TrackPlayer.skip(0);
+      await TrackPlayer.seekTo(0);
+    }
     await TrackPlayer.play();
+    if (!tickInterval) startTicker();
   }
 
   async function pause() {
@@ -182,9 +189,12 @@ export function createPlayer({ segments, onStatus }) {
     await TrackPlayer.pause();
   }
 
+  let ignoreTicksUntil = 0;
+
   // Seek to absolute global position in ms.
   async function seek(globalMs) {
     if (destroyed) return;
+    ignoreTicksUntil = Date.now() + 600; // Ignore native progress updates for 600ms to prevent UI jitter
     await loadPromise;
     const clamped = Math.max(0, Math.min(globalMs, totalDurationMs - 1));
 
@@ -203,6 +213,12 @@ export function createPlayer({ segments, onStatus }) {
       await TrackPlayer.skip(targetIdx);
     }
     await TrackPlayer.seekTo(posInSegMs / 1000);
+    
+    // Manually force one status update immediately so UI feels responsive
+    let stateObj;
+    try { stateObj = await TrackPlayer.getPlaybackState(); } catch {}
+    const isPlaying = stateObj?.state === State.Playing;
+    onStatus?.({ finished: false, positionMs: clamped, totalDurationMs, isPlaying });
   }
 
   // Relative skip (+/- ms from current position).

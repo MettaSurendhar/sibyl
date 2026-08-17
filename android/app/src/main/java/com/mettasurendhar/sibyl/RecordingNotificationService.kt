@@ -69,7 +69,7 @@ class RecordingNotificationService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Recording...")
             .setContentText(formatDuration(durationMs))
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now) // Must be a drawable, not a mipmap!
+            .setSmallIcon(R.drawable.ic_notification) // Must be a drawable, not a mipmap!
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .addAction(toggleAction)
