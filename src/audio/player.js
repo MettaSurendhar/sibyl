@@ -50,18 +50,29 @@ async function ensureSetup() {
     android: {
       appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
     },
+    // Show full set of capabilities in the expanded notification
     capabilities: [
       Capability.Play,
       Capability.Pause,
       Capability.SkipToNext,
       Capability.SkipToPrevious,
       Capability.SeekTo,
+      Capability.Stop,
     ],
+    // Only Play/Pause/Skip in the collapsed (compact) notification
     compactCapabilities: [
       Capability.Play,
       Capability.Pause,
       Capability.SkipToNext,
     ],
+    // Lock-screen / notification icon — use the app icon
+    notificationCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+    ],
+    icon: require('../../assets/icon.png'),
   });
 }
 
@@ -96,7 +107,8 @@ export function createPlayer({ segments, onStatus }) {
     id: String(i),
     url: s.uri,
     title: 'Voice Recording',
-    artist: 'Voice Journal',
+    artist: 'Sibyl',
+    artwork: require('../../assets/icon.png'),
     // duration in seconds — TrackPlayer uses this for the seekbar
     duration: s.durationMs / 1000,
   }));

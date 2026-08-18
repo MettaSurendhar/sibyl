@@ -41,6 +41,9 @@ class MediaControllerSingleton {
 			case 'cancel':
 				this.activeHandler.onCancel?.();
 				break;
+			case 'stop':
+				this.activeHandler.onStop?.();
+				break;
 		}
 		return true;
 	}

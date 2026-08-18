@@ -41,6 +41,7 @@ import PromptModal from '../components/PromptModal';
 import ConfirmModal from '../components/ConfirmModal';
 import FilterSheet from '../components/FilterSheet';
 import { createPlayer } from '../audio/player';
+import { MediaController } from '../services/MediaController';
 
 if (
 	Platform.OS === 'android' &&
@@ -128,9 +129,32 @@ export default function LibraryScreen({ navigation, isEditMode, onEditModeChange
 				playerRef.current = null;
 				setActiveEntryId(null);
 				setIsPlaying(false);
+				MediaController.unregister();
 			};
 		}, [refresh]),
 	);
+
+	// Register MediaController so the notification play/pause buttons sync this UI
+	useEffect(() => {
+		const handler = {
+			onPlay: () => {
+				// Notification pressed play — update UI state; TrackPlayer is already playing
+				setIsPlaying(true);
+			},
+			onPause: () => {
+				// Notification pressed pause — update UI state
+				setIsPlaying(false);
+			},
+			onStop: () => {
+				playerRef.current = null;
+				setActiveEntryId(null);
+				setIsPlaying(false);
+				setPlaybackPos(0);
+			},
+		};
+		MediaController.register(handler);
+		return () => MediaController.unregister(handler);
+	}, []);
 
 	useFocusEffect(
 		useCallback(() => {

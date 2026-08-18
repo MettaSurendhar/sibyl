@@ -1,9 +1,35 @@
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { MediaController } from './MediaController';
 
 module.exports = async function() {
-    TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
-    TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
+
+    // ─── Play / Pause from the notification ─────────────────────────────────
+    TrackPlayer.addEventListener(Event.RemotePlay, async () => {
+        // Check if we're at the end — if so, restart from the beginning
+        const stateObj = await TrackPlayer.getPlaybackState().catch(() => null);
+        if (stateObj?.state === State.Ended) {
+            await TrackPlayer.skip(0);
+            await TrackPlayer.seekTo(0);
+        }
+        await TrackPlayer.play();
+        // Notify the active UI (LibraryScreen / PlaybackScreen) so its play button syncs
+        MediaController.onAction('play');
+    });
+
+    TrackPlayer.addEventListener(Event.RemotePause, async () => {
+        await TrackPlayer.pause();
+        MediaController.onAction('pause');
+    });
+
     TrackPlayer.addEventListener(Event.RemoteNext, () => TrackPlayer.skipToNext());
     TrackPlayer.addEventListener(Event.RemotePrevious, () => TrackPlayer.skipToPrevious());
-    TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.destroy());
+
+    TrackPlayer.addEventListener(Event.RemoteSeek, ({ position }) => {
+        TrackPlayer.seekTo(position);
+    });
+
+    TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+        await TrackPlayer.reset();
+        MediaController.onAction('stop');
+    });
 };
