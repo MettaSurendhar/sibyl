@@ -8,7 +8,7 @@ module.exports = async function() {
         // Check if we're at the end — if so, restart from the beginning
         const stateObj = await TrackPlayer.getPlaybackState().catch(() => null);
         if (stateObj?.state === State.Ended) {
-            await TrackPlayer.skip(0);
+            try { await TrackPlayer.skip(0); } catch {}
             await TrackPlayer.seekTo(0);
         }
         await TrackPlayer.play();
@@ -24,8 +24,12 @@ module.exports = async function() {
     TrackPlayer.addEventListener(Event.RemoteNext, () => TrackPlayer.skipToNext());
     TrackPlayer.addEventListener(Event.RemotePrevious, () => TrackPlayer.skipToPrevious());
 
-    TrackPlayer.addEventListener(Event.RemoteSeek, ({ position }) => {
-        TrackPlayer.seekTo(position);
+    TrackPlayer.addEventListener(Event.RemoteSeek, async ({ position }) => {
+        const stateObj = await TrackPlayer.getPlaybackState().catch(() => null);
+        if (stateObj?.state === State.Ended) {
+            try { await TrackPlayer.skip(0); } catch {}
+        }
+        await TrackPlayer.seekTo(position);
     });
 
     TrackPlayer.addEventListener(Event.RemoteStop, async () => {

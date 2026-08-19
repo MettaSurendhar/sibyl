@@ -26,9 +26,6 @@
         <action android:name="app.notifee.core.ForegroundService"/>
       </intent-filter>
     </service>
-    <!-- Custom Native Recording Notification Service -->
-    <service android:name=".RecordingNotificationService" android:exported="false" android:foregroundServiceType="microphone" />
-    <receiver android:name=".RecordingActionReceiver" android:exported="false" />
     <!-- react-native-track-player: native MediaStyle foreground service for lock screen + persistent controls -->
     <service android:name="com.doublesymmetry.trackplayer.service.MusicService"
       android:exported="false"

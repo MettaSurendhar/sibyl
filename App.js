@@ -1,5 +1,19 @@
-import { initAudioSession } from './src/services/NotificationService';
+import { initAudioSession, handleRecordingAction } from './src/services/NotificationService';
 initAudioSession(); // Configures audio focus so starting our audio pauses other apps
+import notifee, { EventType } from '@notifee/react-native';
+
+// ─── Notifee: must be registered at module level (outside React) ──────────────
+// Keeps the foreground service alive while a recording notification is displayed.
+// The promise resolves when notifee.stopForegroundService() is called.
+notifee.registerForegroundService(() => new Promise(() => {}));
+
+// Handles notification button presses when the app is in the background or locked.
+notifee.onBackgroundEvent(async ({ type, detail }) => {
+	if (type === EventType.ACTION_PRESS) {
+		await handleRecordingAction(detail.pressAction?.id);
+	}
+});
+
 import TrackPlayer from 'react-native-track-player';
 TrackPlayer.registerPlaybackService(() => require('./src/services/PlaybackService'));
 import React, { useEffect, useState } from 'react';

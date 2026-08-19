@@ -5,6 +5,7 @@ import {
 	StyleSheet,
 	BackHandler,
 	Animated,
+	DeviceEventEmitter,
 } from 'react-native';
 import Text from '../theme/Text';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,7 +36,7 @@ import { isExternalFolderSupported } from '../utils/externalFolder';
 import { transcribeFile } from '../groq/transcribe';
 import CategorySheet from '../components/CategorySheet';
 import ConfirmModal from '../components/ConfirmModal';
-import { NotificationService } from '../services/NotificationService';
+import { NotificationService, RECORDING_ACTION_EVENT } from '../services/NotificationService';
 import { MediaController } from '../services/MediaController';
 import { AudioStore } from '../services/AudioStore';
 
@@ -92,25 +93,45 @@ export default function RecordScreen({ navigation }) {
 		}, [refreshCategories]),
 	);
 
-	// Register MediaController so notification buttons work in background
+	// Register MediaController and EventListener so notification buttons work in background
 	useFocusEffect(
 		useCallback(() => {
-			MediaController.register({
-				onPlay: () => { if (statusRef.current === 'paused') handleResume(); },
-				onPause: () => { if (statusRef.current === 'recording') handlePause(); },
-				onSave: () => {
-					if (statusRef.current === 'recording' || statusRef.current === 'paused') {
-						saveBackground();
-					}
-				},
-				onDiscard: () => {
-					if (statusRef.current === 'recording' || statusRef.current === 'paused') {
-						discardBackground();
-					}
+			const handleAction = (action) => {
+				switch (action) {
+					case 'play':
+					case 'resume':
+						if (statusRef.current === 'paused') handleResume();
+						break;
+					case 'pause':
+						if (statusRef.current === 'recording') handlePause();
+						break;
+					case 'save':
+						if (statusRef.current === 'recording' || statusRef.current === 'paused') {
+							saveBackground();
+						}
+						break;
+					case 'discard':
+						if (statusRef.current === 'recording' || statusRef.current === 'paused') {
+							discardBackground();
+						}
+						break;
 				}
+			};
+
+			MediaController.register({
+				onPlay: () => handleAction('play'),
+				onPause: () => handleAction('pause'),
+				onSave: () => handleAction('save'),
+				onDiscard: () => handleAction('discard')
 			});
+
+			const sub = DeviceEventEmitter.addListener(RECORDING_ACTION_EVENT, (event) => {
+				handleAction(event.action);
+			});
+
 			return () => {
 				MediaController.unregister();
+				sub.remove();
 				NotificationService.stopNotification();
 				AudioStore.clearRecorder();
 			};

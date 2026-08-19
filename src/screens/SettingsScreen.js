@@ -546,6 +546,15 @@ export default function SettingsScreen({ navigation }) {
 			</Section>
 
 			<Section
+				title='Recording Notification'
+				theme={theme}
+			>
+				<Text style={{ color: theme.textMuted, fontSize: 13 }}>
+					Due to Android 12+ OS security restrictions, action buttons (Pause/Resume/Save/Discard) on the recording notification may prompt for device unlock when pressed on the lock screen. They may also collapse the notification shade on some devices. This is a known limitation.
+				</Text>
+			</Section>
+
+			<Section
 				title='About'
 				theme={theme}
 			>

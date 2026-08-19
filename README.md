@@ -91,4 +91,5 @@ fixing the file again in `node_modules`).
   `ffmpeg-kit-react-native` was retired in 2025). It works, but keep an eye on it; if it ever
   becomes unmaintained, the fallback is reverting Trim to a non-destructive marker-based approach
   (in-app only, no native dependency) discussed earlier.
+- **Recording Notification (Android 12+)**: Due to Android OS restrictions on broadcast receivers from the lock screen, pressing Pause/Resume/Save/Discard from the recording notification while the device is locked will prompt for a device unlock. Additionally, pressing these buttons when the device is unlocked may collapse the notification shade on some devices. This is a known limitation of the underlying notification library (Notifee).
 

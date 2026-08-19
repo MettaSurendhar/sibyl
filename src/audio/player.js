@@ -187,7 +187,7 @@ export function createPlayer({ segments, onStatus }) {
     try { stateObj = await TrackPlayer.getPlaybackState(); } catch {}
     if (stateObj?.state === State.Ended) {
       // Restart from the beginning if ended
-      await TrackPlayer.skip(0);
+      try { await TrackPlayer.skip(0); } catch {}
       await TrackPlayer.seekTo(0);
     }
     await TrackPlayer.play();
