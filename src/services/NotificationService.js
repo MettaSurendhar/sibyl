@@ -162,7 +162,7 @@ export const NotificationService = {
 					asForegroundService: true,
 					ongoing: true,
 					onlyAlertOnce: true,
-					smallIcon: 'ic_notification',
+					smallIcon: 'ic_sibyl_notif',
 					visibility: AndroidVisibility.PUBLIC,
 					pressAction: { id: 'default', launchActivity: 'default' },
 					actions: [
