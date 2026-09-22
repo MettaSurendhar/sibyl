@@ -13,10 +13,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease",
-        "gradleProperties": {
-          "reactNativeArchitectures": "arm64-v8a"
-        }
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   },
