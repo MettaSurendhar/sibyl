@@ -11,7 +11,13 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "gradleProperties": {
+          "reactNativeArchitectures": "arm64-v8a"
+        }
+      }
     }
   },
   "submit": {
