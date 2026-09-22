@@ -40,11 +40,12 @@ allprojects {
     }
 }
 
-// --- withFfmpegKitFix: redirect dead com.arthenica ffmpeg-kit binaries to a maintained fork ---
+// --- withFfmpegKitFix: redirect dead com.arthenica ffmpeg-kit binaries to the audio-only maintained fork ---
 allprojects {
     configurations.all {
         resolutionStrategy.dependencySubstitution {
-            substitute(module('com.arthenica:ffmpeg-kit-https')).using(module('io.github.maitrungduc1410:ffmpeg-kit-https:6.0.1'))
+            // Use audio-only variant to reduce APK size (~40-60 MB smaller than https/full)
+            substitute(module('com.arthenica:ffmpeg-kit-https')).using(module('io.github.maitrungduc1410:ffmpeg-kit-audio:6.0.1'))
         }
     }
 }
