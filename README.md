@@ -1,21 +1,54 @@
-# Sibyl: Speak, and be remembered
+<div align="center">
+  <img src="assets/icon.png" width="128" height="128" alt="Sibyl Icon">
+  <h1>Sibyl: Speak, and be remembered</h1>
+  <p><strong>A local-first, privacy-respecting voice diary and audio manager.</strong></p>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![F-Droid](https://img.shields.io/badge/F--Droid-Get_it_on-blue?logo=f-droid)](https://f-droid.org/)
+</div>
 
-A local-first, privacy-respecting voice diary app. Sibyl allows you to record audio, automatically name files using custom tag templates, browse and search your archive, and transcribe recordings on-demand. 
+---
+
+Sibyl allows you to record audio, automatically name files using custom tag templates, browse and search your archive, and transcribe recordings on-demand. 
 
 All core features, including audio storage, playback, and editing, work **100% offline**. Your personal recordings never leave your device unless you explicitly choose to share them.
 
-## Features
-- **Local-first Architecture:** SQLite storage with absolute privacy.
-- **Advanced Audio Engine:** Real microphone metering and waveforms.
-- **Audio Editing:** Trim, merge, and append recordings natively (powered by FFmpeg).
-- **Playback Controls:** Synced scrolling waveform, playback speed adjustment, and skip-silence.
-- **Smart Organization:** Group by date, search, filter by tag, and edit in bulk.
-- **On-Demand Transcription:** Convert speech to text securely using Groq's free Whisper API (requires internet).
-- **Theming:** 5 beautifully crafted themes (2 dark, 3 light) adapting to system preferences.
+## 📸 Screenshots
 
-## Building from Source
+| Dashboard & Analytics | Library & Organization |
+|:---:|:---:|
+| <img src="assets/screenshots/home_screen.jpeg" width="300" alt="Home Screen"> | <img src="assets/screenshots/library_main.jpeg" width="300" alt="Library View"> |
+| <img src="assets/screenshots/analytics_breakdown.jpeg" width="300" alt="Analytics"> | <img src="assets/screenshots/recording_playback.jpeg" width="300" alt="Recording Playback"> |
 
-This app is built using React Native and Expo (Bare Workflow). It does not rely on Expo Go. 
+<div align="center">
+  <img src="assets/screenshots/transcript_highlighted.jpeg" width="300" alt="AI Transcription">
+  <p><em>Lightning-fast on-device audio transcription</em></p>
+</div>
+
+## ✨ Features
+
+- **Local-first Architecture:** SQLite storage with absolute privacy. No cloud lock-in.
+- **Advanced Audio Engine:** Real microphone metering and high-performance scrolling waveforms.
+- **Audio Editing:** Trim, merge, and append recordings natively right from your device (powered by FFmpeg).
+- **Playback Controls:** Granular playback speed adjustment (0.5x to 2x) and skip-silence.
+- **Smart Organization:** Group by date, powerful search, filter by color-coded tags, and edit in bulk.
+- **On-Demand AI Transcription:** Convert speech to text securely using Groq's insanely fast Whisper API.
+- **Dynamic Theming:** 5 beautifully crafted themes (2 dark, 3 light) with gorgeous typography that adapts to your system preferences.
+- **Detailed Analytics:** Track your recording habits with beautiful, interactive charts.
+
+## 🚀 Get Sibyl
+
+### Download the APK
+You can grab the latest lightweight APK directly from the [Releases](https://github.com/YourUsername/voice-journal/releases) page. The APK is heavily optimized and compiled exclusively for `arm64-v8a` for a ~50% size reduction.
+
+### F-Droid & IzzyOnDroid
+Sibyl is fully open-source and ready for the F-Droid ecosystem repositories like IzzyOnDroid. The app bundles all necessary fonts, assets, and libraries internally to satisfy open-source compliance. 
+
+---
+
+## 🛠️ Building from Source
+
+This app is built using React Native and Expo (Bare Workflow).
 
 ### Prerequisites
 - Node.js (v18+)
@@ -34,21 +67,11 @@ npm install
 npx expo start --dev-client
 ```
 
-### Building the APK (Locally or via EAS)
-To build a standalone APK, you can use Expo Application Services (EAS):
-```bash
-eas build --profile preview --platform android
-```
-*(Note: The build is heavily optimized for `arm64-v8a` and utilizes an audio-only FFmpeg package to keep the APK size extremely lightweight).*
-
-## Groq Transcription Setup (Optional)
-If you wish to use the transcription feature:
+## 📝 Groq Transcription Setup (Optional)
+If you wish to use the ultra-fast transcription feature:
 1. Generate a free API key at [console.groq.com/keys](https://console.groq.com/keys).
-2. Open the app → Library → ⋮ → Settings → paste the key under "Transcription (Groq)".
-3. The app will compress and chunk your audio before securely sending it for transcription.
+2. Open the app → Library → Settings ⚙️ → paste the key under "Transcription (Groq)".
+3. The app automatically compresses and chunks your audio before securely sending it for transcription.
 
-## F-Droid & IzzyOnDroid Availability
-Sibyl is fully open-source and compatible with F-Droid ecosystem repositories like IzzyOnDroid. The app bundles all necessary fonts, assets, and libraries internally to satisfy open-source compliance. 
-
-## License
+## 📜 License
 Sibyl is released under the **MIT License**. See the `LICENSE` file for more details.
