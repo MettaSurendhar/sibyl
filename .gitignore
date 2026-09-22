@@ -10,3 +10,32 @@ npm-debug.*
 *.orig.*
 web-build/
 .DS_Store
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/.cxx/
+
+# iOS
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/.symlinks/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE / Editors
+.vscode/
+.idea/
+*.iml
+*.swp
+
+# React Native specific
+metro.config.js*
+!metro.config.js
+coverage/
